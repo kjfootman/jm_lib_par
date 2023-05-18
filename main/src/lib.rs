@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use jm_math::prelude::*;
 use devtimer::run_benchmark;
 use rayon::prelude::*;
@@ -59,7 +61,80 @@ pub fn test2() {
     println!();
     println!("single thread operation: {:>10.4} sec", time0);
     println!("multi thread operation: {:>10.4} sec", time1);
+}
 
-    let v = Vector::from([true, false]);
-    println!("{}", v);
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
+pub fn test3() {
+    let n = 10;
+    let m = 10_000_000;
+    // let m = 10;
+    let mut AA = vec![3.0, 1.0];
+    let mut JA = vec![0usize, 1];
+    let mut IA = vec![0];
+
+    for i in 1..m - 1 {
+        IA.push(AA.len());
+
+        AA.push(1.0);
+        AA.push(3.0);
+        AA.push(1.0);
+        
+        JA.push(i - 1);
+        JA.push(i);
+        JA.push(i + 1);
+    }
+
+    IA.push(AA.len());
+    AA.append(&mut vec![1.0, 3.0]);
+    JA.append(&mut vec![m - 2, m - 1]);
+    IA.push(AA.len());
+
+    let v = Mutex::new(Vector::from(vec![0.0; m]));
+
+    //* single thread operation */
+    let bench_result = run_benchmark(n, |_| {
+        let mut v = v.lock().unwrap();
+
+        for i in 0..m {
+            for j in IA[i]..IA[i+1] {
+                v[i] += AA[j] * v[JA[j]];
+            }
+        }
+
+        v.AA().iter().sum::<f64>();
+    });
+    let time0 = bench_result.get_average() as f64 * 1.0E-9;
+    
+    let M = Matrix::from(AA, JA, IA);
+    
+    //* multi thread operation */
+    let bench_result = run_benchmark(n, |_| {
+        let v = v.lock().unwrap();
+        let v = &M * &v;
+
+        v.par_iter().sum::<f64>();
+    });
+    let time1 = bench_result.get_average() as f64 * 1.0E-9;
+
+    println!();
+    println!("single thread operation: {:>10.4} sec", time0);
+    println!("multi thread operation: {:>10.4} sec", time1);
+
+    // let v = Vector::from(vec![1f64; m]);
+    // println!("{:.2}", &M * &v);
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
+pub fn test4() {
+    let AA = [3, 1, 1, 3, 1, 1, 3, 1, 1, 3, 1, 1, 3];
+    let JA = [0usize, 1, 0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4];
+    let IA = [0usize, 2, 5, 8, 11 , 13];
+
+    let v = Vector::from([4, 5, 5, 5, 4]); 
+    let A = Matrix::from(AA, JA, IA);
+
+    let x = msolver::GMRES(1000, 1E-13, 2, &A, &v);
+    // println!("{}", x);
 }

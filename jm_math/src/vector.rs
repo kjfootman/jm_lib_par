@@ -18,21 +18,19 @@ impl Vector {
         }
     }
 
-    pub fn from_iter<I: IntoIterator>(v: I) -> Vector where I::Item: Into<f64> {
-        let AA = v.into_iter().map(|v| {
-            v.into()
-        }).collect::<Vec<f64>>();
-
-        Vector::from(AA)
-    }
-
 //-----------------------------------------------------------------------------------------------------------//
-    pub fn dim(&self) -> usize {
+    pub fn num_rows(&self) -> usize {
         self.m
     }
 
     pub fn AA(&self) -> &Vec<f64> {
         &self.AA
+    }
+
+    pub fn l2_norm(&self) -> f64 {
+        self.AA.par_iter()
+            .map(|v| v * v)
+            .sum::<f64>().sqrt()
     }
 }
 
@@ -42,9 +40,8 @@ impl Add<&Vector> for &Vector {
 
     fn add(self, rhs: &Vector) -> Self::Output {
         let AA = (self.AA(), rhs.AA()).into_par_iter()
-            .map(|(v1, v2)| {
-                v1 + v2
-            }).collect::<Vec<f64>>();
+            .map(|(v1, v2)| v1 + v2)
+            .collect::<Vec<f64>>();
 
         Vector::from(AA)
     }
@@ -54,9 +51,8 @@ impl Add<&Vector> for &Vector {
 impl AddAssign<&Vector> for Vector {
     fn add_assign(&mut self, rhs: &Vector) {
         let AA = (self.AA(), rhs.AA()).into_par_iter()
-            .map(|(v1, v2)| {
-                v1 + v2
-            }).collect::<Vec<f64>>();
+            .map(|(v1, v2)| v1 + v2)
+            .collect::<Vec<f64>>();
 
         *self = Vector::from(AA);
     }
@@ -68,9 +64,8 @@ impl Sub<&Vector> for &Vector {
 
     fn sub(self, rhs: &Vector) -> Self::Output {
         let AA = (self.AA(), rhs.AA()).into_par_iter()
-            .map(|(v1, v2)| {
-                v1 - v2
-            }).collect::<Vec<f64>>();
+            .map(|(v1, v2)| v1 - v2)
+            .collect::<Vec<f64>>();
 
         Vector::from(AA)
     }    
@@ -80,9 +75,8 @@ impl Sub<&Vector> for &Vector {
 impl SubAssign<&Vector> for Vector {
     fn sub_assign(&mut self, rhs: &Vector) {
         let AA = (self.AA(), rhs.AA()).into_par_iter()
-            .map(|(v1, v2)| {
-                v1 - v2
-            }).collect::<Vec<f64>>();
+            .map(|(v1, v2)| v1 - v2 )
+            .collect::<Vec<f64>>();
 
         *self = Vector::from(AA);
     }
@@ -94,9 +88,8 @@ impl Mul<&Vector> for &Vector {
 
     fn mul(self, rhs: &Vector) -> Self::Output {
         let sum = (self.AA(), rhs.AA()).into_par_iter()
-            .map(|(v1, v2)| {
-                v1 * v2
-            }).sum::<f64>();
+            .map(|(v1, v2)| v1 * v2)
+            .sum::<f64>();
         
         sum
     }
@@ -108,23 +101,21 @@ impl Mul<&Vector> for f64 {
 
     fn mul(self, rhs: &Vector) -> Self::Output {
         let AA = rhs.AA().par_iter()
-            .map(|v| {
-                self * v
-            }).collect::<Vec<f64>>();
+            .map(|v| self * v)
+            .collect::<Vec<f64>>();
         
         Vector::from(AA)
     }
 }
 
 /***********************************************************************************************************/
-impl Div<f64> for Vector {
+impl Div<f64> for &Vector {
     type Output = Vector;
 
     fn div(self, rhs: f64) -> Self::Output {
         let AA = self.AA().par_iter()
-            .map(|v| {
-                v / rhs
-            }).collect::<Vec<f64>>();
+            .map(|v| v / rhs)
+            .collect::<Vec<f64>>();
 
         Vector::from(AA)
     }
