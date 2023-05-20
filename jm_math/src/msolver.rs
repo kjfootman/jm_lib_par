@@ -9,6 +9,8 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
     let mut x = Vector::from(vec![0.0; m]);
 
     while iter < iMax && residual > tol {
+        assert!(A.num_cols() == b.num_rows());
+
         let mut V: Vec<Vector> = Vec::with_capacity(restart);
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
@@ -69,11 +71,160 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
     }
     println!("{print}");
     
-    // println!("GMRES({})-------iter:{}", restart, iter);
+    x
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> Vector {
+    assert!(A.num_cols() == b.num_rows());
+
+    let m = b.num_rows();
+    let bl = b.l2_norm();
+    let mut iter = 0;
+    let mut residual = f64::MAX;
+    let mut x = Vector::from(vec![0.0; m]); 
+    
+    while iter < iMax && residual > tol {
+        // let mut degree = 0;
+        let mut W: Vec<Vector> = Vec::with_capacity(restart);
+        let mut H = Vec::with_capacity(restart);
+        let mut g = Vec::from(vec![0.0; restart + 1]);
+        let mut z = b - &(A * &x);
+        let mut sum;
+        let mut t ; // temperary 
+
+        for j in 0..restart + 1 {
+            //* calculate Householder vector
+            match Householder_vec(j, &z) {
+                Some(w) => {
+                    // degree = j;
+                    W.push(w);
+                },
+                None => {
+                    // todo: parallelize z.iter() -> z.par_iter()
+                    let mut tmp = z.iter().map(|&v| v).collect::<Vec<f64>>();
+                    tmp.push(0.0);
+                    H.push(tmp);
+                    break;
+                } 
+            }
+
+            //* calculate h[j-1] = P[j]z[j] 
+            if j != 0 {
+                let mut h = z[0..=j].iter()
+                    .map(|&v| v)
+                    .collect::<Vec<f64>>();
+                h[j] = z[j];
+                for k in j..m {
+                    h[j] -= 2.0 * W[j][0] * W[j][k-j] * z[k];
+                }
+
+                H.push(h);
+
+                if H[j-1][j].abs() < tol {
+                    println!("lucky breakdown");
+                    // degree = j - 1;
+                    break;
+                }
+            } else {
+                g[0] = -z[0].signum() * z.l2_norm();
+            }
+
+            //* calculate basis vector v[j] = P(0) P(1) .. P(j) e(j)
+            let mut v = Vector::from(vec![0.0; m]);
+            v[j] = 1.0;
+
+            t = Vector::from(vec![0.0; m]);
+            for n in (0..=j).rev() {
+                println!("here");
+                for i in n..m {
+                    sum = 0.0;
+                    for k in n..m {
+                        sum += 2.0 * W[n][i-n] * W[n][k-n] * v[k];
+                    }
+                    t[i] = v[i] - sum;
+                }
+
+                println!("here");
+                for i in n..m {
+                    v[i] = t[i];
+                }
+            }
+
+            //* calculate z = P(j) .. P(1) P(0) A v(j)
+            z = A * &v;
+            for n in 0..=j {
+                for i in n..m {
+                    sum = 0.0;
+                    for k in n..m{
+                        sum += 2.0 * W[n][i-n] * W[n][k-n] * z[k];
+                    }
+                    t[i] = z[i] - sum;        
+                }
+
+                for i in n..m {
+                    z[i] = t[i];
+                }
+            }
+            // println!();
+        }
+        
+        // * Girven's rotation
+        Givens_rotation(&mut H, &mut g, &tol);
+
+        // * upper triangular matrix solve
+        let y = upper_triangular_solve(&H, &g);
+
+        // * update solution
+        z = Vector::from(vec![0.0; m]);
+        for n in (0..H.len()).rev() {
+            t = Vector::from(vec![0.0; m]);
+            z[n] += y[n];
+            for i in n..m {
+                sum = 0.0;
+                for k in n..m {
+                    sum += 2.0 * W[n][i-n] * W[n][k-n] * z[k];
+                }
+                t[i] = z[i] - sum;
+            }
+            z = t;
+        }
+        x += &z;
+
+        // println!("iteration: {}, residual: {:.4E}", self.iter, g[H.len()].abs() / bl);
+        iter += 1;
+        residual = g[H.len()].abs() / bl;
+    
+    } 
+
+    let mut print = format!(
+        "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.2E}",
+        restart,
+        "-".repeat(10),
+        iter,
+        residual
+    );
+
+    if iter == iMax {
+        print.push_str(", ***** maximum iteration exceeded!");
+    }
+
+    println!("{print}");
 
     x
 }
 
+fn Householder_vec(i: usize, v: &Vector) -> Option<Vector> {
+    let n = v.len();
+    let mut w = Vec::with_capacity(n - i);
+    w.extend_from_slice(&v[i..n]);
+    let mut w = Vector::from(w);
+
+    w[0] = v.get(i)? + v.get(i)?.signum() * w.l2_norm(); 
+    Some(&w / w.l2_norm())
+}
+
+//-----------------------------------------------------------------------------------------------------------//
 fn Givens_rotation(H: &mut Vec<Vec<f64>>, g: &mut Vec<f64>, tol: &f64) {
     let v = H.last().expect("error in last colum of H")
                     .last().expect("error in las element of H[j]"); 
@@ -106,6 +257,7 @@ fn Givens_rotation(H: &mut Vec<Vec<f64>>, g: &mut Vec<f64>, tol: &f64) {
     }
 }
 
+//-----------------------------------------------------------------------------------------------------------//
 fn upper_triangular_solve(H: &Vec<Vec<f64>>, g: &Vec<f64>) -> Vec<f64> {
     let mut y = vec![0.0; H.len()];
 
@@ -118,4 +270,50 @@ fn upper_triangular_solve(H: &Vec<Vec<f64>>, g: &Vec<f64>) -> Vec<f64> {
     }
     
     y
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn Conjugate_gradient(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vector {
+    assert!(A.num_cols() == b.num_rows());        
+    
+    let m = b.num_rows();
+    let bl =  b.l2_norm();
+    let mut iter = 0;
+    let mut residual = f64::MAX;
+    let mut x = Vector::from(vec![0.0; m]);
+    let mut r = b - &(A * &x);
+    let mut p = Vector::from(r.clone());
+    let mut rsold = &r * &r;
+
+    while iter < iMax && residual > tol {
+        let Ap = A * &p;
+        let alpha = rsold / (&p * &Ap);
+        
+        x += &(alpha * &p);
+        r -= &(alpha * &Ap);
+        // * rsnew = &r * &z;
+        let rsnew = &r * &r;
+
+        residual = rsnew / bl;
+        // println!("{:5.2} residual: {:5.4E}", x, self.residual);
+
+        p = &r + &((rsnew / rsold) * &p);
+        rsold = rsnew;
+        
+        iter += 1;
+    }
+    
+    let mut print = format!(
+        "MSolver: CG {} iteration: {:5}, residual: {:.2E}",
+        "-".repeat(10),
+        iter,
+        residual
+    );
+
+    if iter == iMax {
+        print.push_str(", ***** maximum iteration exceeded!");
+    }
+    println!("{print}");
+
+    x
 }
