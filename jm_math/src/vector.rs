@@ -1,6 +1,6 @@
 use std::fmt;
 use std::convert::From;
-use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div};
+use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div, Neg};
 use std::ops::{Deref, DerefMut};
 use rayon::prelude::*;
 
@@ -115,6 +115,19 @@ impl Div<f64> for &Vector {
     fn div(self, rhs: f64) -> Self::Output {
         let AA = self.AA().par_iter()
             .map(|v| v / rhs)
+            .collect::<Vec<f64>>();
+
+        Vector::from(AA)
+    }
+}
+
+/***********************************************************************************************************/
+impl Neg for Vector {
+    type Output = Vector;
+
+    fn neg(self) -> Self::Output {
+        let AA = self.AA.par_iter()
+            .map(|v| -v)
             .collect::<Vec<f64>>();
 
         Vector::from(AA)

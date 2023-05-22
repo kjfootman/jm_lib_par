@@ -1,3 +1,3 @@
 fn main() {
-    main::test4();
+    main::test5();
 }

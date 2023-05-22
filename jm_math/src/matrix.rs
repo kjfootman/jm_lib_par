@@ -86,7 +86,6 @@ impl Mul<&Vector> for &Matrix {
         let mut AA = vec![0f64; m];
         let data = Arc::new(Mutex::new(&mut AA));
 
-        // 
         rayon::join(|| {
             let data = Arc::clone(&data);
             let mut v = data.lock().unwrap();

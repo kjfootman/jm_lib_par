@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use jm_math::prelude::*;
 use devtimer::run_benchmark;
@@ -139,12 +139,12 @@ pub fn test4() {
     // let x = msolver::HGMRES(1000, 1E-13, 2, &A, &v);
     // println!("{}", x);
 
-    let m = 300;
+    let m = 3_000_000;
     let (A, b) = tri_diagonal(m);
     // println!("{:.2}", A);
     // println!("{:.2}", b);
     let bench_result = run_benchmark(10, |_| {
-        let x = msolver::HGMRES(1000, 1.0E-13, 5, &A, &b);
+        let x = msolver::GMRES(1000, 1.0E-13, 5, &A, &b);
         println!("{:.2}", x.AA().par_iter().sum::<f64>());
     });
     let time0 = bench_result.get_average() as f64 * 1.0E-9;
@@ -163,14 +163,78 @@ pub fn test4() {
 
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
+pub fn test5() {
+    let m = 7_000_000;
+    let (A, b) = tri_diagonal(m);
+
+    // let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
+    // println!("{}", x.par_iter().sum::<f64>());
+
+    let bench_result = run_benchmark(1, |_| {
+        let x = msolver::Conjugate_gradient(1000, 1.0E-13, &A, &b);
+        println!("{:.2}", x.par_iter().sum::<f64>());
+    });
+    let time1 = bench_result.get_average() as f64 * 1.0E-9;
+
+    let bench_result = run_benchmark(1, |_| {
+        let x = msolver::Gauss_Seidel(1000, 1.0E-13, &A, &b);
+        println!("{:.2}", x.par_iter().sum::<f64>());
+    });
+    let time2 = bench_result.get_average() as f64 * 1.0E-9;
+
+    let bench_result = run_benchmark(1, |_| {
+        let x = msolver::GMRES(1000, 1.0E-13, 3, &A, &b);
+        println!("{:.2}", x.par_iter().sum::<f64>());
+    });
+    let time0 = bench_result.get_average() as f64 * 1.0E-9;
+
+    let bench_result = run_benchmark(1, |_| {
+        let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
+        println!("{:.2}", x.par_iter().sum::<f64>());
+    });
+    let time3 = bench_result.get_average() as f64 * 1.0E-9;
+
+    println!();
+    println!("CG: {:>10.4} sec", time1);
+    println!("GS: {:>10.4} sec", time2);
+    println!("GMRES: {:>10.4} sec", time0);
+    println!("HGMRES: {:>10.4} sec", time3);
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
+pub fn test6() {
+    let n = 1000;
+    let m = 100_000_000;
+    let v1 = vec![1.0; m];
+    let v2 = vec![1.0; m];
+    let mut v3 = vec![0.0; m];
+
+    v3[n..m].par_iter_mut().enumerate()
+        .for_each(|(i, v)| *v -= v1[i] * v2[i]);
+
+    println!("sum: {}", v3.par_iter().sum::<f64>());
+
+    let AA = vec![5, 1, 2, 1, 1, 1, 4];
+    let JA = vec![0usize, 2, 1, 2, 0, 1, 2];
+    let IA = vec![0usize, 2, 4, 7];
+    let b = Vector::from(vec![8, 7, 15]);
+
+    let A = Matrix::from(AA, JA, IA);
+    let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
+    println!("{:.2}", x);
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
 fn tri_diagonal(m: usize) -> (Matrix, Vector) {
     // let m = 10_000_000;
     // let m = 10;
-    let a = 2.3;
+    let a = 3.0;
     let mut AA = vec![a, 1.0];
     let mut JA = vec![0usize, 1];
     let mut IA = vec![0];
-    let mut v = vec![5f64; m - 2];
+    let mut v = vec![a + 2.0; m - 2];
 
     for i in 1..m - 1 {
         IA.push(AA.len());
