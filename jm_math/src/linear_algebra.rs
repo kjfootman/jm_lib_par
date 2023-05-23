@@ -1,0 +1,6 @@
+#[allow(non_snake_case)]
+pub mod vector;
+#[allow(non_snake_case)]
+pub mod matrix;
+#[allow(non_snake_case)]
+pub mod msolver;

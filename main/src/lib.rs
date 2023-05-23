@@ -165,32 +165,33 @@ pub fn test4() {
 #[allow(non_snake_case)]
 pub fn test5() {
     let m = 7_000_000;
+    let tol = 1.0E-10;
     let (A, b) = tri_diagonal(m);
 
     // let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
     // println!("{}", x.par_iter().sum::<f64>());
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::Conjugate_gradient(1000, 1.0E-13, &A, &b);
-        println!("{:.2}", x.par_iter().sum::<f64>());
+        let x = msolver::Conjugate_gradient(1000, tol, &A, &b);
+        println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time1 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::Gauss_Seidel(1000, 1.0E-13, &A, &b);
-        println!("{:.2}", x.par_iter().sum::<f64>());
+        let x = msolver::Gauss_Seidel(1000, tol, &A, &b);
+        println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time2 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::GMRES(1000, 1.0E-13, 3, &A, &b);
-        println!("{:.2}", x.par_iter().sum::<f64>());
+        let x = msolver::GMRES(1000, tol, 5, &A, &b);
+        println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time0 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
-        println!("{:.2}", x.par_iter().sum::<f64>());
+        let x = msolver::HGMRES(1000, tol, 5, &A, &b);
+        println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time3 = bench_result.get_average() as f64 * 1.0E-9;
 

@@ -1,9 +1,10 @@
-use rayon::prelude::{IntoParallelIterator, ParallelIterator, IntoParallelRefMutIterator, IndexedParallelIterator, IntoParallelRefIterator};
-use std::sync::{Arc, Mutex};
-use crate::vector::Vector;
-use crate::matrix::Matrix;
+use rayon::prelude::*;
+use crate::linear_algebra::vector::Vector;
+use crate::linear_algebra::matrix::Matrix;
 
 pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> Vector {
+    assert!(A.num_cols() == b.num_rows());
+
     let m = b.num_rows();
     let bl = b.l2_norm();
     let mut iter = 0;
@@ -61,7 +62,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
     }
 
     let mut print = format!(
-        "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.2E}",
+        "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.4E}",
         restart,
         "-".repeat(10),
         iter,
@@ -92,8 +93,6 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
         let mut z = b - &(A * &x);
-        // let mut sum = 0.0;
-        // let mut t ; // temperary 
 
         for j in 0..restart + 1 {
             //* calculate Householder vector
@@ -117,24 +116,15 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
                     .collect::<Vec<f64>>();
                 h[j] = z[j];
                 // todo: parallelize z.iter() -> z.par_iter()
-                // for k in j..m {
-                //     h[j] -= 2.0 * W[j][0] * W[j][k-j] * z[k];
-                // }
+                
                 let sigma = (&z.AA()[j..m], &W[j][0..m-j]).into_par_iter()
                     .map(|(v1, v2)| v1 * v2).sum::<f64>();
                 h[j] = z[j] - 2.0 * sigma * W[j][0];
                 
-                // h[j..m].par_iter_mut().enumerate()
-                //     .for_each(|(i, v)|{
-                //         // println!("n: {}, i: {}", n, i);
-                //         *v -= 2.0 * sigma * W[j][i]
-                //     });
-
                 H.push(h);
 
                 if H[j-1][j].abs() < tol {
                     println!("lucky breakdown");
-                    // degree = j - 1;
                     break;
                 }
             } else {
@@ -149,54 +139,16 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
             for n in (0..=j).rev() {
                 let sigma = (&v.AA()[n..m], &W[n][0..m-n]).into_par_iter()
                     .map(|(v1, v2)| v1 * v2).sum::<f64>();
-                // sigma = transepose(W[n])v
 
                 v[n..m].par_iter_mut().enumerate()
                     .for_each(|(i, v)|{
                         // println!("n: {}, i: {}", n, i);
                         *v -= 2.0 * sigma * W[n][i]
                     });
-
-                // v[n..m].iter_mut().enumerate()
-                //     .for_each(|(i, v)| {
-                //         *v -= 2.0 * dot * W[n][i]
-                //     })
             }
-            ///////////////////////////
-            
-            // t = Vector::from(vec![0.0; m]);
-            // for n in (0..=j).rev() {
-            //     // println!("here n: {}", n);
-            //     for i in n..m {
-            //         sum = 0.0;
-            //         for k in n..m {
-            //             sum += 2.0 * W[n][i-n] * W[n][k-n] * v[k];
-            //         }
-            //         t[i] = v[i] - sum;
-            //     }
-
-            //     // println!("here");
-            //     for i in n..m {
-            //         v[i] = t[i];
-            //     }
-            // }
 
             //* calculate z = P(j) .. P(1) P(0) A v(j)
             z = A * &v;
-            // for n in 0..=j {
-            //     for i in n..m {
-            //         sum = 0.0;
-            //         for k in n..m{
-            //             sum += 2.0 * W[n][i-n] * W[n][k-n] * z[k];
-            //         }
-            //         t[i] = z[i] - sum;        
-            //     }
-
-            //     for i in n..m {
-            //         z[i] = t[i];
-            //     }
-            // }
-
             for n in 0..=j {
                 let sigma = (&z.AA()[n..m], &W[n][0..m-n]).into_par_iter()
                     .map(|(v1, v2)| v1 * v2).sum::<f64>();
@@ -217,18 +169,6 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
 
         // * update solution z = P(j)(y(j)e(j) - z)
         z = Vector::from(vec![0.0; m]);
-        // for n in (0..H.len()).rev() {
-        //     t = Vector::from(vec![0.0; m]);
-        //     z[n] += y[n];
-        //     for i in n..m {
-        //         sum = 0.0;
-        //         for k in n..m {
-        //             sum += 2.0 * W[n][i-n] * W[n][k-n] * z[k];
-        //         }
-        //         t[i] = z[i] - sum;
-        //     }
-        //     z = t;
-        // }
         for n in (0..H.len()).rev() {
             z[n] += y[n];
 
@@ -248,7 +188,7 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
     } 
 
     let mut print = format!(
-        "MSolver: HGMRES({}) {} iteration: {:5}, residual: {:.2E}",
+        "MSolver: HGMRES({}) {} iteration: {:5}, residual: {:.4E}",
         restart,
         "-".repeat(10),
         iter,
@@ -266,10 +206,6 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
 
 fn Householder_vec(i: usize, v: &Vector) -> Option<Vector> {
     let n = v.len();
-    // let mut w = Vec::with_capacity(n - i);
-    // w.extend_from_slice(&v[i..n]);
-    // let mut w = Vector::from(w);
-
     let AA = v[i..n].par_iter().map(|&v| v).collect::<Vec<f64>>();
     let mut w = Vector::from(AA);
 
@@ -346,9 +282,11 @@ pub fn Conjugate_gradient(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vecto
         r -= &(alpha * &Ap);
         // * rsnew = &r * &z;
         let rsnew = &r * &r;
+        // let rsnew = r.l2_norm();
+        // let rsnew = (b - &(A * &x)).l2_norm();
 
-        residual = rsnew / bl;
-        // println!("{:5.2} residual: {:5.4E}", x, self.residual);
+        // residual = rsnew / bl;
+        residual = (b - &(A * &x)).l2_norm() / bl;
 
         p = &r + &((rsnew / rsold) * &p);
         rsold = rsnew;
@@ -357,7 +295,7 @@ pub fn Conjugate_gradient(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vecto
     }
     
     let mut print = format!(
-        "MSolver: CG {} iteration: {:5}, residual: {:.2E}",
+        "MSolver: CG {} iteration: {:5}, residual: {:.4E}",
         "-".repeat(10),
         iter,
         residual
@@ -403,7 +341,7 @@ pub fn Gauss_Seidel(iMax: usize, tol: f64, A: &Matrix, b: &Vector) -> Vector {
     }
 
     let mut print = format!(
-        "MSolver: Gauss-Seidel {} iteration: {:5}, residual: {:.2E}",
+        "MSolver: Gauss-Seidel {} iteration: {:5}, residual: {:.4E}",
         "-".repeat(10),
         iter,
         residual

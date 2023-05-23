@@ -3,7 +3,8 @@ use std::convert::From;
 use std::ops::Mul;
 use std::sync::{Mutex, Arc};
 use rayon::prelude::*;
-use crate::vector::Vector;
+// use crate::vector::Vector;
+use crate::linear_algebra::vector::Vector;
 
 pub struct Matrix {
     m: usize,

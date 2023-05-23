@@ -1,12 +1,7 @@
-#[allow(non_snake_case)]
-mod vector;
-#[allow(non_snake_case)]
-mod matrix;
-#[allow(non_snake_case)]
-pub mod msolver;
+mod linear_algebra;
 
 pub mod prelude {
-    pub use crate::vector::Vector;
-    pub use crate::matrix::Matrix;
-    pub use crate::msolver;
+    pub use crate::linear_algebra::vector::Vector;
+    pub use crate::linear_algebra::matrix::Matrix;
+    pub use crate::linear_algebra::msolver;
 }
