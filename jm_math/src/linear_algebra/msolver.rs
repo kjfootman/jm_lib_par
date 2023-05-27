@@ -27,7 +27,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         for j in 0..restart {
             let mut v = A * &V[j];
             let mut h = vec![0.0; j + 2];
-
+            
             for i in 0..=j {
                 h[i] = &v * &V[i];
                 v -= &(h[i] * &V[i]);
@@ -283,11 +283,9 @@ pub fn Conjugate_gradient(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vecto
         r -= &(alpha * &Ap);
         // * rsnew = &r * &z;
         let rsnew = &r * &r;
-        // let rsnew = r.l2_norm();
-        // let rsnew = (b - &(A * &x)).l2_norm();
 
-        // residual = rsnew / bl;
-        residual = (b - &(A * &x)).l2_norm() / bl;
+        residual = rsnew.sqrt() / bl;
+        // residual = (b - &(A * &x)).l2_norm() / bl;
 
         p = &r + &((rsnew / rsold) * &p);
         rsold = rsnew;

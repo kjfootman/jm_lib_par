@@ -229,17 +229,23 @@ pub fn test6() {
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
 pub fn test7() {
-    let AA = [2, 3, 1, 2, 3];
-    let JA = [0usize, 0, 1, 1, 2];
-    let IA = [0usize, 1, 3, 5];
-    let M = Matrix::from(AA, JA, IA);
-    let v = Vector::from(vec![2, 4, 5]);
+    // let AA = [2, 3, 1, 2, 3];
+    // let JA = [0usize, 0, 1, 1, 2];
+    // let IA = [0usize, 1, 3, 5];
+    // let M = Matrix::from(AA, JA, IA);
+    // let v = Vector::from(vec![2, 4, 5]);
 
-    println!("{:.2}", M);
-    println!("{:.2}", v);
+    // println!("{:.2}", M);
+    // println!("{:.2}", v);
+    let m = 1000;
+    let (M, v) = tri_diagonal(m);
 
-    let x = preconditioner::SGS(&M, &v);
-    println!("{:.2}", x);
+    let bench_result = run_benchmark(1, |_| {
+        let x = preconditioner::Jacobi(&M, &v);
+        println!("{:.6}", x.par_iter().sum::<f64>());
+    });
+    let time1 = bench_result.get_average() as f64 * 1.0E-9;
+    println!("time: {:>10.4} sec", time1);
 }
 
 //-----------------------------------------------------------------------------------------------------------//
