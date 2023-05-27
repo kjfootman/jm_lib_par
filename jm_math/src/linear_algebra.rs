@@ -4,3 +4,7 @@ pub mod vector;
 pub mod matrix;
 #[allow(non_snake_case)]
 pub mod msolver;
+#[allow(non_snake_case)]
+pub mod preconditioner;
+// todo: shall be private module
+// mod preconditioner;

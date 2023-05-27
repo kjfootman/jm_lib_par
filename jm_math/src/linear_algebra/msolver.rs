@@ -1,6 +1,7 @@
 use rayon::prelude::*;
 use crate::linear_algebra::vector::Vector;
 use crate::linear_algebra::matrix::Matrix;
+use crate::linear_algebra::preconditioner as precon;
 
 pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> Vector {
     assert!(A.num_cols() == b.num_rows());

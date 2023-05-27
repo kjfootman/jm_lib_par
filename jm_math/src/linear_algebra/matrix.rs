@@ -82,30 +82,17 @@ impl Mul<&Vector> for &Matrix {
     type Output = Vector;
 
     fn mul(self, rhs: &Vector) -> Self::Output {
+        assert!(self.m == rhs.num_rows());
+        
         let m = self.m;
-        let mid = m / 2;
         let mut AA = vec![0f64; m];
-        let data = Arc::new(Mutex::new(&mut AA));
 
-        rayon::join(|| {
-            let data = Arc::clone(&data);
-            let mut v = data.lock().unwrap();
-
-            for i in 0..mid {
+        AA.par_iter_mut().enumerate()
+            .for_each(|(i, v)| {
                 for j in self.IA[i]..self.IA[i+1] {
-                    v[i] += self.AA[j] * rhs[self.JA[j]];
+                    *v += self.AA[j] * rhs[self.JA[j]];
                 }
-            }
-        }, || {
-            let data = Arc::clone(&data);
-            let mut v = data.lock().unwrap();
-
-            for i in mid..m {
-                for j in self.IA[i]..self.IA[i+1] {
-                    v[i] += self.AA[j] * rhs[self.JA[j]];
-                }
-            }
-        });
+            });
 
         Vector::from(AA)
     }

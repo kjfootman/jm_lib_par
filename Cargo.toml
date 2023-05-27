@@ -2,8 +2,6 @@
 members = ["main", "jm_math"]
 
 [workspace.dependencies]
-# serde = {version = }
 serde = "1.0.162"
 serde_yaml = "0.9.21"
 rayon = "1.7.0"
-# devtimer = "*"

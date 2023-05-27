@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use jm_math::prelude::*;
 use devtimer::run_benchmark;
@@ -228,9 +228,23 @@ pub fn test6() {
 
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
+pub fn test7() {
+    let AA = [2, 3, 1, 2, 3];
+    let JA = [0usize, 0, 1, 1, 2];
+    let IA = [0usize, 1, 3, 5];
+    let M = Matrix::from(AA, JA, IA);
+    let v = Vector::from(vec![2, 4, 5]);
+
+    println!("{:.2}", M);
+    println!("{:.2}", v);
+
+    let x = preconditioner::SGS(&M, &v);
+    println!("{:.2}", x);
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
 fn tri_diagonal(m: usize) -> (Matrix, Vector) {
-    // let m = 10_000_000;
-    // let m = 10;
     let a = 3.0;
     let mut AA = vec![a, 1.0];
     let mut JA = vec![0usize, 1];
