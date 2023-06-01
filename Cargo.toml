@@ -5,3 +5,4 @@ members = ["main", "jm_math"]
 serde = "1.0.162"
 serde_yaml = "0.9.21"
 rayon = "1.7.0"
+regex = "1.8.3"

@@ -19,21 +19,25 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
         let r = b - &(A * &x);
+        let r = precon::Gauss_Seidel(A, &r);
+        // let r = precon::Jacobi(A, &r);
 
         g[0] = r.l2_norm();
         V.push(&r / g[0]);
 
         // * Arnoli's method
         for j in 0..restart {
-            let mut v = A * &V[j];
+            let mut w = precon::Gauss_Seidel(A, &(A * &V[j]));
+            // let mut w = precon::Jacobi(A, &(A * &V[j]));
+            // let mut w = A * &V[j];
             let mut h = vec![0.0; j + 2];
             
             for i in 0..=j {
-                h[i] = &v * &V[i];
-                v -= &(h[i] * &V[i]);
+                h[i] = &w * &V[i];
+                w -= &(h[i] * &V[i]);
             }
 
-            h[j+1] = v.l2_norm();
+            h[j+1] = w.l2_norm();
             H.push(h);
 
             // degree = j + 1;
@@ -44,8 +48,8 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
                 break;
             }
 
-            v = &v / H[j][j+1];
-            V.push(v);
+            w = &w / H[j][j+1];
+            V.push(w);
         }
 
         // * Given's rotation

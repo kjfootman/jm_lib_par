@@ -1,8 +1,10 @@
 use std::fmt;
 use std::convert::From;
 use std::ops::Mul;
-use std::sync::{Mutex, Arc};
+use std::path::PathBuf;
+// use std::sync::{Mutex, Arc};
 use rayon::prelude::*;
+use regex::Regex;
 // use crate::vector::Vector;
 use crate::linear_algebra::vector::Vector;
 
@@ -23,6 +25,76 @@ impl Matrix {
             AA: Vec::new(), 
             JA: Vec::new(), 
             IA: Vec::new() 
+        }
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn import_file(path: &str) -> Matrix {
+        let path = PathBuf::from(path);
+        
+        if path.exists() {
+            println!("import matrix from {}", path.display());
+            let mut m = usize::MAX; 
+            let mut n = usize::MAX; 
+            let mut z = usize::MAX;
+            let mut re;
+            let text = std::fs::read_to_string(path)
+                .expect("can not read file");
+            let mut data = vec![];
+            
+            // header
+            re = Regex::new(r"%%MatrixMarket matrix coordinate\s(\w+)\s(\w+)").unwrap(); 
+            for cap in re.captures_iter(&text) {
+                println!("{}, {}", &cap[1], &cap[2]);
+            }
+
+            // parse dimension
+            re = Regex::new(r"(\d+)\s(\d+)\s(\d+)\n").unwrap(); 
+            for cap in re.captures_iter(&text) {
+                m = cap[1].trim().parse::<usize>().unwrap();
+                n = cap[2].trim().parse::<usize>().unwrap();
+                z = cap[3].trim().parse::<usize>().unwrap();
+            }
+            if m != n {
+                println!("caution: not square a matrix");
+            }
+
+            // parse each row to the tuple of (i, j, value)
+            re = Regex::new(r"(\d+)\s(\d+)\s([-|\s].+)").unwrap(); 
+            for cap in re.captures_iter(&text) {
+                data.push((
+                    cap[1].parse::<usize>().unwrap(),
+                    cap[2].parse::<usize>().unwrap(),
+                    cap[3].trim().parse::<f64>().unwrap(),
+                ));
+            }
+
+            // sort by row
+            data.sort_by(|a, b| {
+                a.0.cmp(&b.0).then(a.1.cmp(&b.1))
+            });
+
+            // assemble matrix
+            let mut AA = Vec::with_capacity(z);
+            let mut JA = Vec::with_capacity(z);
+            let mut IA = Vec::with_capacity(m);
+            let mut row = usize::MAX;
+
+            for (i, j, value) in &data {
+                if i - 1 != row {
+                    row = i - 1;
+                    IA.push(AA.len());
+                }
+                AA.push(*value);
+                JA.push(j - 1);
+            }
+            IA.push(data.len());
+
+            println!("done.");
+            Matrix::from(AA, JA, IA)
+        } else {            
+            println!("can not find file {}", path.display());
+            Matrix::new()
         }
     }
 

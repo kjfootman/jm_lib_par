@@ -229,29 +229,51 @@ pub fn test6() {
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
 pub fn test7() {
-    // let AA = [2, 3, 1, 2, 3];
-    // let JA = [0usize, 0, 1, 1, 2];
-    // let IA = [0usize, 1, 3, 5];
-    // let M = Matrix::from(AA, JA, IA);
-    // let v = Vector::from(vec![2, 4, 5]);
+    //* preconditioner verification
+    let AA = vec![1f64; 29];
+    let JA = vec![
+        0usize, 0, 1, 1, 2, 2, 3, 0, 4, 1, 4, 5, 2, 5, 6,
+        3, 6, 7, 4, 8, 5, 8, 9, 6, 9, 10, 7, 10, 11
+    ];
+    let IA = vec![0usize, 1, 3, 5, 7, 9, 12, 15, 18, 20, 23, 26, 29];
+    let M = Matrix::from(AA, JA, IA);
 
-    // println!("{:.2}", M);
-    // println!("{:.2}", v);
-    let m = 1000;
-    let (M, v) = tri_diagonal(m);
+    let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
+    let v = Vector::from(v);
 
-    let bench_result = run_benchmark(1, |_| {
-        let x = preconditioner::Jacobi(&M, &v);
-        println!("{:.6}", x.par_iter().sum::<f64>());
-    });
-    let time1 = bench_result.get_average() as f64 * 1.0E-9;
-    println!("time: {:>10.4} sec", time1);
+    let x = preconditioner::level_schduling(&M, &v);
+    // println!("{:.2}", x);
+
+    // let M = Matrix::import_file("./res/bcsstk01.mtx");
+    let M = Matrix::import_file("./res/nos4.mtx");
+    let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
+    let v = Vector::from(v);
+    // let x = msolver::GMRES(1000, 1.0E-10, 5, &M, &v);
+    // let x = msolver::HGMRES(1000, 1.0E-10, 5, &M, &v);
+    let x = msolver::Gauss_Seidel(1000, 1.0E-10, &M, &v);
+    // println!("{x:.2}");
+    // let (M, v) = tri_diagonal(7_000_000);
+
+    // let bench_result = run_benchmark(10, |_| {
+    //     let x = preconditioner::level_schduling(&M, &v);
+    //     println!("{:.2}", x.par_iter().sum::<f64>());
+    // });
+    // let time0 = bench_result.get_average() as f64 * 1.0E-9;
+
+    // let bench_result = run_benchmark(10, |_| {
+    //     let x = preconditioner::Gauss_Seidel(&M, &v);
+    //     println!("{:.2}", x.par_iter().sum::<f64>());
+    // });
+    // let time1 = bench_result.get_average() as f64 * 1.0E-9;
+
+    // println!("level schdule: {:>10.4} sec", time0);
+    // println!("serial GS: {:>10.4} sec", time1);
 }
 
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
 fn tri_diagonal(m: usize) -> (Matrix, Vector) {
-    let a = 3.0;
+    let a = 2.0;
     let mut AA = vec![a, 1.0];
     let mut JA = vec![0usize, 1];
     let mut IA = vec![0];
