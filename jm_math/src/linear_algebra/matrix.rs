@@ -13,7 +13,8 @@ pub struct Matrix {
     n: usize,
     AA: Vec<f64>,
     JA: Vec<usize>,
-    IA: Vec<usize>
+    IA: Vec<usize>,
+    // UPTR: Vec<usize>
 }
 
 /***********************************************************************************************************/
@@ -24,7 +25,7 @@ impl Matrix {
             n: 0, 
             AA: Vec::new(), 
             JA: Vec::new(), 
-            IA: Vec::new() 
+            IA: Vec::new(),
         }
     }
 
@@ -37,6 +38,7 @@ impl Matrix {
             let mut m = usize::MAX; 
             let mut n = usize::MAX; 
             let mut z = usize::MAX;
+            let mut symmetry = false;
             let mut re;
             let text = std::fs::read_to_string(path)
                 .expect("can not read file");
@@ -45,7 +47,8 @@ impl Matrix {
             // header
             re = Regex::new(r"%%MatrixMarket matrix coordinate\s(\w+)\s(\w+)").unwrap(); 
             for cap in re.captures_iter(&text) {
-                println!("{}, {}", &cap[1], &cap[2]);
+                symmetry = cap[2].to_string().eq("symmetric");
+                // println!("{}, {}", &cap[1], &cap[2]);
             }
 
             // parse dimension
@@ -63,10 +66,20 @@ impl Matrix {
             re = Regex::new(r"(\d+)\s(\d+)\s([-|\s].+)").unwrap(); 
             for cap in re.captures_iter(&text) {
                 data.push((
-                    cap[1].parse::<usize>().unwrap(),
-                    cap[2].parse::<usize>().unwrap(),
+                    cap[1].trim().parse::<usize>().unwrap(),
+                    cap[2].trim().parse::<usize>().unwrap(),
                     cap[3].trim().parse::<f64>().unwrap(),
                 ));
+            }
+
+            //* if symmetric matrix */
+            if symmetry {
+                let upper = data.par_iter()
+                    .filter(|(i, j, _)| i != j)
+                    .map(|(i, j, value)| {
+                        (*j, *i, *value)
+                    }).collect::<Vec<_>>();
+                data.par_extend(upper.par_iter());
             }
 
             // sort by row

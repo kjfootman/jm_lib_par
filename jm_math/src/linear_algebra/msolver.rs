@@ -19,7 +19,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
         let r = b - &(A * &x);
-        let r = precon::Gauss_Seidel(A, &r);
+        // let r = precon::Gauss_Seidel(A, &r);
         // let r = precon::Jacobi(A, &r);
 
         g[0] = r.l2_norm();
@@ -27,11 +27,18 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
 
         // * Arnoli's method
         for j in 0..restart {
-            let mut w = precon::Gauss_Seidel(A, &(A * &V[j]));
-            // let mut w = precon::Jacobi(A, &(A * &V[j]));
             // let mut w = A * &V[j];
             let mut h = vec![0.0; j + 2];
-            
+
+            // lerft preconditioning
+            // let mut w = precon::Gauss_Seidel(A, &(A * &V[j]));
+            // let mut w = precon::Jacobi(A, &(A * &V[j]));
+
+            //* right preconditioning
+            let mut w = precon::Gauss_Seidel(A, &V[j]);
+            // let mut w = precon::Jacobi(A, &V[j]);
+            w = A * &w;
+
             for i in 0..=j {
                 h[i] = &w * &V[i];
                 w -= &(h[i] * &V[i]);
@@ -58,12 +65,23 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         // * Upper triangular matrix solve
         let y = upper_triangular_solve(&H, &g);
 
+        // for i in 0..H.len() {
+        //     x += &(y[i] * &V[i]);
+        // }
+
+        //* right preconditioning
+        let mut z = Vector::from(vec![0f64; m]);
         for i in 0..H.len() {
-            x += &(y[i] * &V[i]);
+            z += &(y[i] * &V[i]);
         }
+        x += &precon::Gauss_Seidel(A, &z);
+        // x += &precon::Jacobi(A, &z);
 
         iter += 1;
         residual = g[H.len()].abs() / bl;
+        // let tmp = (b - &(A * &x)).l2_norm() / bl;
+        // println!("residutal: {:.4e}, tmp: {:.4e}", residual * bl, tmp * bl);
+        // residual = tmp;
     }
 
     let mut print = format!(
@@ -267,7 +285,7 @@ fn upper_triangular_solve(H: &Vec<Vec<f64>>, g: &Vec<f64>) -> Vec<f64> {
 }
 
 //-----------------------------------------------------------------------------------------------------------//
-pub fn Conjugate_gradient(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vector {
+pub fn CG(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vector {
     assert!(A.num_cols() == b.num_rows());        
     
     let m = b.num_rows();

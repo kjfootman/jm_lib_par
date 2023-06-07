@@ -150,7 +150,7 @@ pub fn test4() {
     let time0 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(10, |_| {
-        let x = msolver::Conjugate_gradient(1000, 1.0E-13, &A, &b);
+        let x = msolver::CG(1000, 1.0E-13, &A, &b);
         println!("{:.2}", x.AA().par_iter().sum::<f64>());
     });
     let time1 = bench_result.get_average() as f64 * 1.0E-9;
@@ -172,7 +172,7 @@ pub fn test5() {
     // println!("{}", x.par_iter().sum::<f64>());
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::Conjugate_gradient(1000, tol, &A, &b);
+        let x = msolver::CG(1000, tol, &A, &b);
         println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time1 = bench_result.get_average() as f64 * 1.0E-9;
@@ -241,33 +241,22 @@ pub fn test7() {
     let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
     let v = Vector::from(v);
 
-    let x = preconditioner::level_schduling(&M, &v);
+    // let x = preconditioner::level_schduling(&M, &v);
     // println!("{:.2}", x);
 
     // let M = Matrix::import_file("./res/bcsstk01.mtx");
     let M = Matrix::import_file("./res/nos4.mtx");
     let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
     let v = Vector::from(v);
-    // let x = msolver::GMRES(1000, 1.0E-10, 5, &M, &v);
-    // let x = msolver::HGMRES(1000, 1.0E-10, 5, &M, &v);
-    let x = msolver::Gauss_Seidel(1000, 1.0E-10, &M, &v);
-    // println!("{x:.2}");
-    // let (M, v) = tri_diagonal(7_000_000);
-
-    // let bench_result = run_benchmark(10, |_| {
-    //     let x = preconditioner::level_schduling(&M, &v);
-    //     println!("{:.2}", x.par_iter().sum::<f64>());
-    // });
-    // let time0 = bench_result.get_average() as f64 * 1.0E-9;
-
-    // let bench_result = run_benchmark(10, |_| {
-    //     let x = preconditioner::Gauss_Seidel(&M, &v);
-    //     println!("{:.2}", x.par_iter().sum::<f64>());
-    // });
-    // let time1 = bench_result.get_average() as f64 * 1.0E-9;
-
-    // println!("level schdule: {:>10.4} sec", time0);
-    // println!("serial GS: {:>10.4} sec", time1);
+    // println!("{:>13.2}", M);
+    let x = msolver::GMRES(1000, 1.0E-13, 10, &M, &v);
+    println!("{:.6}", x.iter().sum::<f64>());
+    // let x = msolver::HGMRES(1000, 1.0E-12, 5, &M, &v);
+    // println!("{}", x.iter().sum::<f64>());
+    // let x = msolver::Gauss_Seidel(1000, 1.0E-13, &M, &v);
+    // println!("{}", x.iter().sum::<f64>());
+    let x = msolver::CG(1000, 1.0E-13, &M, &v);
+    println!("{:.6}", x.iter().sum::<f64>());
 }
 
 //-----------------------------------------------------------------------------------------------------------//
