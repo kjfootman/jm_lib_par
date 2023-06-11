@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 
 use jm_math::prelude::*;
-use devtimer::run_benchmark;
+use devtimer::{run_benchmark, DevTime};
 use rayon::prelude::*;
 
 const DIM: usize = 300_000_000;
@@ -144,7 +144,7 @@ pub fn test4() {
     // println!("{:.2}", A);
     // println!("{:.2}", b);
     let bench_result = run_benchmark(10, |_| {
-        let x = msolver::GMRES(1000, 1.0E-13, 5, &A, &b);
+        let x = msolver::GMRES(1000, 1.0E-13, 5, &A, &b, Preconditioner::GS);
         println!("{:.2}", x.AA().par_iter().sum::<f64>());
     });
     let time0 = bench_result.get_average() as f64 * 1.0E-9;
@@ -184,13 +184,13 @@ pub fn test5() {
     let time2 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::GMRES(1000, tol, 5, &A, &b);
+        let x = msolver::GMRES(1000, tol, 5, &A, &b, Preconditioner::GS);
         println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time0 = bench_result.get_average() as f64 * 1.0E-9;
 
     let bench_result = run_benchmark(1, |_| {
-        let x = msolver::HGMRES(1000, tol, 5, &A, &b);
+        let x = msolver::HGMRES(1000, tol, 5, &A, &b, Preconditioner::GS);
         println!("{:.6}", x.par_iter().sum::<f64>());
     });
     let time3 = bench_result.get_average() as f64 * 1.0E-9;
@@ -222,7 +222,7 @@ pub fn test6() {
     let b = Vector::from(vec![8, 7, 15]);
 
     let A = Matrix::from(AA, JA, IA);
-    let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b);
+    let x = msolver::HGMRES(1000, 1.0E-13, 3, &A, &b, Preconditioner::GS);
     println!("{:.2}", x);
 }
 
@@ -230,6 +230,7 @@ pub fn test6() {
 #[allow(non_snake_case)]
 pub fn test7() {
     //* preconditioner verification
+    let n = 1;
     let AA = vec![1f64; 29];
     let JA = vec![
         0usize, 0, 1, 1, 2, 2, 3, 0, 4, 1, 4, 5, 2, 5, 6,
@@ -244,19 +245,67 @@ pub fn test7() {
     // let x = preconditioner::level_schduling(&M, &v);
     // println!("{:.2}", x);
 
-    // let M = Matrix::import_file("./res/bcsstk01.mtx");
-    let M = Matrix::import_file("./res/nos4.mtx");
+    let M = Matrix::import_mtx("res/nos4.mtx");
+    // let M = Matrix::import_mtx("./res/nos4.mtx");
+    // let M = Matrix::import_mtx("res/bcsstm12.mtx");
+    // let (M, v) = tri_diagonal(7);
     let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
     let v = Vector::from(v);
     // println!("{:>13.2}", M);
-    let x = msolver::GMRES(1000, 1.0E-13, 10, &M, &v);
-    println!("{:.6}", x.iter().sum::<f64>());
-    // let x = msolver::HGMRES(1000, 1.0E-12, 5, &M, &v);
-    // println!("{}", x.iter().sum::<f64>());
-    // let x = msolver::Gauss_Seidel(1000, 1.0E-13, &M, &v);
-    // println!("{}", x.iter().sum::<f64>());
-    let x = msolver::CG(1000, 1.0E-13, &M, &v);
-    println!("{:.6}", x.iter().sum::<f64>());
+
+    let bench_result = run_benchmark(n, |_| {
+        let x = msolver::GMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
+        println!("{:.6}", x.iter().sum::<f64>());
+    });
+    let time0 = bench_result.get_average() as f64 * 1.0E-9;
+
+    let bench_result = run_benchmark(n, |_| {
+        let x = msolver::HGMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
+        println!("{:.6}", x.iter().sum::<f64>());
+    });
+    let time1 = bench_result.get_average() as f64 * 1.0E-9;
+
+    let bench_result = run_benchmark(n, |_| {
+        let x = msolver::CG(1000, 1.0E-13, &M, &v);
+        println!("{:.6}", x.iter().sum::<f64>());
+    });
+    let time2 = bench_result.get_average() as f64 * 1.0E-9;
+    
+    println!();
+    println!("GMRES: {:>10.4} sec", time0);
+    println!("HGMRES: {:>10.4} sec", time1);
+    println!("CG: {:>10.4} sec", time2);
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
+pub fn test8() {
+    let AA = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
+    let JA = vec![0usize, 3, 1, 2, 3, 0, 2, 3, 3];
+    let IA = vec![0usize, 2, 5, 8, 9];
+    // let M = Matrix::import_mtx("./res/bcsstk01.mtx");
+    let A = Matrix::from(AA, JA, IA);
+    let v = Vector::from(vec![1, 3, 13, 9]);
+     
+    // let m = 7_000_000;
+    // let m = 4;
+    // let (A, v) = tri_diagonal(m);
+
+    // let A = Matrix::import_mtx("res/nos4.mtx");
+    let A = Matrix::import_mtx("res/bcsstk01.mtx");
+    let v = (0..A.num_rows()).map(|i| A.AA()[A.IA()[i]..A.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
+    let v = Vector::from(v);
+
+    let M = preconditioner::GS(&A);
+    let x = preconditioner::LU_solve(&M, &v);
+    // println!("{:.2}", M);
+    // println!("{:?}", M.UPTR());
+    println!("{:.4}", x);
+    println!("{}", x.iter().sum::<f64>());
+    
+    let x = preconditioner::Gauss_Seidel(&A, &v);
+    println!("{}", x.iter().sum::<f64>());
+
 }
 
 //-----------------------------------------------------------------------------------------------------------//

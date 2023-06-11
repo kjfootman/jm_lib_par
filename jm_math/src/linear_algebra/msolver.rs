@@ -1,9 +1,9 @@
 use rayon::prelude::*;
 use crate::linear_algebra::vector::Vector;
 use crate::linear_algebra::matrix::Matrix;
-use crate::linear_algebra::preconditioner as precon;
+use crate::linear_algebra::preconditioner::{self as precon, Preconditioner};
 
-pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> Vector {
+pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: Preconditioner) -> Vector {
     assert!(A.num_cols() == b.num_rows());
 
     let m = b.num_rows();
@@ -11,6 +11,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
     let mut iter = 0;
     let mut residual = f64::MAX;
     let mut x = Vector::from(vec![0.0; m]);
+    let P = P.from(A);
 
     while iter < iMax && residual > tol {
         assert!(A.num_cols() == b.num_rows());
@@ -19,6 +20,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
         let r = b - &(A * &x);
+        // let M = precon::GS(&A);
         // let r = precon::Gauss_Seidel(A, &r);
         // let r = precon::Jacobi(A, &r);
 
@@ -34,10 +36,15 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
             // let mut w = precon::Gauss_Seidel(A, &(A * &V[j]));
             // let mut w = precon::Jacobi(A, &(A * &V[j]));
 
-            //* right preconditioning
-            let mut w = precon::Gauss_Seidel(A, &V[j]);
+            //* right preconditioning w = A * M_inv * w
+            let mut w = match &P {
+                Some(M) => A * &precon::LU_solve(M, &V[j]),
+                None => A * &V[j]
+            };
+            // let mut w = precon::LU_solve(&M, &V[j]);
+            // let mut w = precon::Gauss_Seidel(A, &V[j]);
             // let mut w = precon::Jacobi(A, &V[j]);
-            w = A * &w;
+            // w = A * w;
 
             for i in 0..=j {
                 h[i] = &w * &V[i];
@@ -69,12 +76,18 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
         //     x += &(y[i] * &V[i]);
         // }
 
-        //* right preconditioning
         let mut z = Vector::from(vec![0f64; m]);
         for i in 0..H.len() {
             z += &(y[i] * &V[i]);
         }
-        x += &precon::Gauss_Seidel(A, &z);
+        
+        //* right preconditioning x = x + M_inv * z
+        x = match &P {
+            Some(M) => &x + &precon::LU_solve(M, &z),
+            None => &x + &z
+        };
+        // x += &precon::LU_solve(&M, &z);
+        // x += &precon::Gauss_Seidel(A, &z);
         // x += &precon::Jacobi(A, &z);
 
         iter += 1;
@@ -101,7 +114,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> V
 }
 
 //-----------------------------------------------------------------------------------------------------------//
-pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> Vector {
+pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: Preconditioner) -> Vector {
     assert!(A.num_cols() == b.num_rows());
 
     let m = b.num_rows();
@@ -109,7 +122,8 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
     let mut iter = 0;
     let mut residual = f64::MAX;
     let mut x = Vector::from(vec![0.0; m]); 
-    
+    let P = P.from(A);
+
     while iter < iMax && residual > tol {
         // let mut degree = 0;
         let mut W: Vec<Vector> = Vec::with_capacity(restart);
@@ -119,18 +133,20 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
 
         for j in 0..restart + 1 {
             //* calculate Householder vector
-            match Householder_vec(j, &z) {
-                Some(w) => {
-                    // degree = j;
-                    W.push(w);
-                },
-                None => {
-                    let mut tmp = z.par_iter().map(|&v| v).collect::<Vec<f64>>();
-                    tmp.push(0.0);
-                    H.push(tmp);
-                    break;
-                } 
-            }
+            // match Householder_vec(j, &z) {
+            //     Some(w) => {
+            //         // degree = j;
+            //         W.push(w);
+            //     },
+            //     None => {
+            //         println!("householder tmp");
+            //         let mut tmp = z.par_iter().map(|&v| v).collect::<Vec<f64>>();
+            //         tmp.push(0.0);
+            //         H.push(tmp);
+            //         break;
+            //     } 
+            // }
+            W.push(Householder_vec(j, &z).unwrap());
 
             //* calculate h[j-1] = P[j]z[j] 
             if j != 0 {
@@ -138,7 +154,6 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
                     .map(|&v| v)
                     .collect::<Vec<f64>>();
                 h[j] = z[j];
-                // todo: parallelize z.iter() -> z.par_iter()
                 
                 let sigma = (&z.AA()[j..m], &W[j][0..m-j]).into_par_iter()
                     .map(|(v1, v2)| v1 * v2).sum::<f64>();
@@ -171,7 +186,13 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
             }
 
             //* calculate z = P(j) .. P(1) P(0) A v(j)
-            z = A * &v;
+            //* right preconditioning z = A * M_inv * v(j)
+            z = match &P {
+                Some(M) => A * &precon::LU_solve(M, &v),
+                None => A * &v
+            };
+            // z = A * &v;
+
             for n in 0..=j {
                 let sigma = (&z.AA()[n..m], &W[n][0..m-n]).into_par_iter()
                     .map(|(v1, v2)| v1 * v2).sum::<f64>();
@@ -203,7 +224,13 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector) -> 
                     *v -= 2.0 * sigma * W[n][i]
                 });
         }
-        x += &z;
+
+        //* right preconditioning x = x + M_inv * z
+        x = match &P {
+            Some(M) => &x + &precon::LU_solve(M, &z),
+            None => &x + &z
+        };
+        // x += &z;
 
         // println!("iteration: {}, residual: {:.4E}", self.iter, g[H.len()].abs() / bl);
         iter += 1;

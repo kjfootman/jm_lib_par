@@ -1,9 +1,36 @@
+use core::panic;
+
 use rayon::prelude::*;
 // use std::sync::{Arc, Mutex};
 use crate::linear_algebra::matrix::Matrix;
 use crate::linear_algebra::vector::Vector;
 
-//-----------------------------------------------------------------------------------------------------------//
+pub enum Preconditioner {
+    Jacobi,
+    GS,
+    SGS,
+    SOR(f64),
+    SSOR(f64),
+    ILU,
+    None
+}
+
+impl Preconditioner {
+    pub fn from(&self, A: &Matrix) -> Option<Matrix> {
+        match self {
+            Preconditioner::GS => {
+                println!("Gauss-Seidel preconditioner");
+                Some(GS(A))
+            },
+            Preconditioner::None => {
+                println!("preconditioner not used");
+                None
+            },
+            _ => panic!("not available preconditioner")
+        }
+    }
+}
+
 //-----------------------------------------------------------------------------------------------------------//
 pub fn none<'a>(_A: &Matrix, b: &'a Vector) -> &'a Vector {
 
@@ -117,7 +144,7 @@ pub fn level_schduling(A: &Matrix, b: &Vector) -> Vector {
     }
     level.push(q.len());
 
-    // println!("num_levels: {}", level.len() - 1);
+    println!("num_levels: {}", level.len() - 1);
     //
 
     for lev in 0..level.len() - 1 {
@@ -150,9 +177,92 @@ pub fn level_schduling(A: &Matrix, b: &Vector) -> Vector {
         });
     }
 
-// test for rayon
-//----------------------------------------//
+    x
+}
 
-//----------------------------------------//
+//-----------------------------------------------------------------------------------------------------------//
+pub fn GS(A: &Matrix) -> Matrix {
+    // Gauss Seidel preconditioner
+    // return lower part of A as a preconditioner
+
+    let m = A.num_rows();
+    let mut AA = Vec::with_capacity(A.AA().len());
+    let mut JA = Vec::with_capacity(A.JA().len());
+    let mut IA = vec![0usize; m+1];
+    let mut UPTR = vec![usize::MAX; m];
+
+    for i in 0..m {
+        let j1 = A.IA()[i];
+        let mut j = j1;
+        let mut jrow;
+
+        // for lower elements
+        loop {
+            jrow = A.JA()[j];
+
+            if jrow >= i {
+                break;
+            }
+
+            AA.push(A.AA()[j] * AA[UPTR[jrow]]);
+            JA.push(jrow);
+
+            j += 1;
+        }
+
+        // for upper elements
+        if jrow != i || A.AA()[j] == 0f64 {
+            panic!("diagonal element error");
+        }
+
+        UPTR[i] = AA.len();
+        AA.push(1f64 / A.AA()[j]);
+        JA.push(jrow);
+        IA[i+1] = AA.len();
+    }
+
+    AA.shrink_to_fit();
+    JA.shrink_to_fit();
+
+    let mut M = Matrix::from(AA, JA, IA);
+    M.set_dia_ptr(UPTR);
+
+    M
+    // Matrix::new()
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn LU_solve(M: &Matrix, v: &Vector) -> Vector {
+    // LU solver
+    // L: unit lower matrix
+    // U: upper matrix
+
+    let m = M.num_rows();
+    let UPTR = match M.UPTR() {
+        Some(uptr) => {
+            uptr
+        },
+        None => {
+            panic!("can not find diagonal pointer");
+        }
+    };
+    let mut x = Vector::from(vec![0f64; m]);
+
+    // foward sweep
+    for i in 0..m {
+        x[i] = v[i];
+        for j in M.IA()[i]..UPTR[i] {
+            x[i] -= M.AA()[j] * x[M.JA()[j]];
+        }
+    }
+
+    // backward sweep
+    for i in (0..m).rev() {
+        for j in UPTR[i]+1..M.IA()[i+1] {
+            x[i] -= M.AA()[j] * x[M.JA()[j]];
+        }
+        x[i] *= M.AA()[UPTR[i]];
+    }
+
     x
 }

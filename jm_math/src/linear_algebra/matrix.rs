@@ -14,7 +14,7 @@ pub struct Matrix {
     AA: Vec<f64>,
     JA: Vec<usize>,
     IA: Vec<usize>,
-    // UPTR: Vec<usize>
+    UPTR: Option<Vec<usize>>
 }
 
 /***********************************************************************************************************/
@@ -26,11 +26,12 @@ impl Matrix {
             AA: Vec::new(), 
             JA: Vec::new(), 
             IA: Vec::new(),
+            UPTR: None
         }
     }
 
 //-----------------------------------------------------------------------------------------------------------//
-    pub fn import_file(path: &str) -> Matrix {
+    pub fn import_mtx(path: &str) -> Matrix {
         let path = PathBuf::from(path);
         
         if path.exists() {
@@ -136,7 +137,8 @@ impl Matrix {
             n,
             AA,
             JA,
-            IA
+            IA,
+            UPTR: None
         }
     }
 
@@ -159,6 +161,14 @@ impl Matrix {
     
     pub fn IA(&self) -> &Vec<usize> {
         &self.IA
+    }
+
+    pub fn UPTR(&self) -> &Option<Vec<usize>> {
+        &self.UPTR
+    }
+
+    pub fn set_dia_ptr(&mut self, UPTR: Vec<usize>) {
+        self.UPTR = Some(UPTR);
     }
 }
 
