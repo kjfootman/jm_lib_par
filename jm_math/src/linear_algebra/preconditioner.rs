@@ -19,11 +19,11 @@ impl Preconditioner {
     pub fn from(&self, A: &Matrix) -> Option<Matrix> {
         match self {
             Preconditioner::GS => {
-                println!("Gauss-Seidel preconditioner");
+                // println!("Gauss-Seidel preconditioner");
                 Some(GS(A))
             },
             Preconditioner::None => {
-                println!("preconditioner not used");
+                // println!("preconditioner not used");
                 None
             },
             _ => panic!("not available preconditioner")
@@ -184,7 +184,6 @@ pub fn level_schduling(A: &Matrix, b: &Vector) -> Vector {
 pub fn GS(A: &Matrix) -> Matrix {
     // Gauss Seidel preconditioner
     // return lower part of A as a preconditioner
-
     let m = A.num_rows();
     let mut AA = Vec::with_capacity(A.AA().len());
     let mut JA = Vec::with_capacity(A.JA().len());
@@ -246,7 +245,7 @@ pub fn LU_solve(M: &Matrix, v: &Vector) -> Vector {
             panic!("can not find diagonal pointer");
         }
     };
-    let mut x = Vector::from(vec![0f64; m]);
+    let mut x = Vector::from(vec![0.0; m]);
 
     // foward sweep
     for i in 0..m {

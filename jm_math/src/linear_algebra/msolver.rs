@@ -3,7 +3,7 @@ use crate::linear_algebra::vector::Vector;
 use crate::linear_algebra::matrix::Matrix;
 use crate::linear_algebra::preconditioner::{self as precon, Preconditioner};
 
-pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: Preconditioner) -> Vector {
+pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, preconditioner: Preconditioner) -> Vector {
     assert!(A.num_cols() == b.num_rows());
 
     let m = b.num_rows();
@@ -11,7 +11,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: P
     let mut iter = 0;
     let mut residual = f64::MAX;
     let mut x = Vector::from(vec![0.0; m]);
-    let P = P.from(A);
+    let P = preconditioner.from(A);
 
     while iter < iMax && residual > tol {
         assert!(A.num_cols() == b.num_rows());
@@ -44,8 +44,9 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: P
             // let mut w = precon::LU_solve(&M, &V[j]);
             // let mut w = precon::Gauss_Seidel(A, &V[j]);
             // let mut w = precon::Jacobi(A, &V[j]);
-            // w = A * w;
-
+            // let mut w = A * &V[j];
+            // w = A * &w;
+            
             for i in 0..=j {
                 h[i] = &w * &V[i];
                 w -= &(h[i] * &V[i]);
@@ -76,7 +77,7 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: P
         //     x += &(y[i] * &V[i]);
         // }
 
-        let mut z = Vector::from(vec![0f64; m]);
+        let mut z = Vector::from(vec![0.0; m]);
         for i in 0..H.len() {
             z += &(y[i] * &V[i]);
         }
@@ -89,32 +90,44 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: P
         // x += &precon::LU_solve(&M, &z);
         // x += &precon::Gauss_Seidel(A, &z);
         // x += &precon::Jacobi(A, &z);
+        // x += &z;
 
         iter += 1;
         residual = g[H.len()].abs() / bl;
-        // let tmp = (b - &(A * &x)).l2_norm() / bl;
+        let tmp = (b - &(A * &x)).l2_norm() / bl;
         // println!("residutal: {:.4e}, tmp: {:.4e}", residual * bl, tmp * bl);
-        // residual = tmp;
+        residual = tmp;
+        // println!("iter: {iter}, residual: {residual}");
     }
 
-    let mut print = format!(
-        "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.4E}",
-        restart,
-        "-".repeat(10),
+    let log = Log {
+        solver: "GMRES",
+        precon: preconditioner,
+        restart: Some(restart),
+        iMax,
         iter,
         residual
-    );
+    };
 
-    if iter == iMax {
-        print.push_str(", ***** maximum iteration exceeded!");
-    }
-    println!("{print}");
+    display(log);
+    // let mut print = format!(
+    //     "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.4E}",
+    //     restart,
+    //     "-".repeat(10),
+    //     iter,
+    //     residual
+    // );
+
+    // if iter == iMax {
+    //     print.push_str(", ***** maximum iteration exceeded!");
+    // }
+    // println!("{print}");
     
     x
 }
 
 //-----------------------------------------------------------------------------------------------------------//
-pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: Preconditioner) -> Vector {
+pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, preconditioner: Preconditioner) -> Vector {
     assert!(A.num_cols() == b.num_rows());
 
     let m = b.num_rows();
@@ -122,7 +135,7 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: 
     let mut iter = 0;
     let mut residual = f64::MAX;
     let mut x = Vector::from(vec![0.0; m]); 
-    let P = P.from(A);
+    let P = preconditioner.from(A);
 
     while iter < iMax && residual > tol {
         // let mut degree = 0;
@@ -237,19 +250,30 @@ pub fn HGMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, P: 
         residual = g[H.len()].abs() / bl;
     } 
 
-    let mut print = format!(
-        "MSolver: HGMRES({}) {} iteration: {:5}, residual: {:.4E}",
-        restart,
-        "-".repeat(10),
+    let log = Log {
+        solver: "HGMRES",
+        precon: preconditioner,
+        restart: Some(restart),
+        iMax,
         iter,
         residual
-    );
+    };
 
-    if iter == iMax {
-        print.push_str(", ***** maximum iteration exceeded!");
-    }
+    display(log);
 
-    println!("{print}");
+    // let mut print = format!(
+    //     "MSolver: HGMRES({}) {} iteration: {:5}, residual: {:.4E}",
+    //     restart,
+    //     "-".repeat(10),
+    //     iter,
+    //     residual
+    // );
+
+    // if iter == iMax {
+    //     print.push_str(", ***** maximum iteration exceeded!");
+    // }
+
+    // println!("{print}");
 
     x
 }
@@ -278,7 +302,7 @@ fn Givens_rotation(H: &mut Vec<Vec<f64>>, g: &mut Vec<f64>, tol: &f64) {
         let hCol = &H[j];
         let r = hCol[j];
         let h = hCol[j+1];
-        let l = (r.powi(2) + h.powi(2)).sqrt();
+        let l = (r.powf(2.0) + h.powf(2.0)).sqrt();
         let cos = r / l;
         let sin = -h / l;
         let g0 = g[j];
@@ -313,6 +337,7 @@ fn upper_triangular_solve(H: &Vec<Vec<f64>>, g: &Vec<f64>) -> Vec<f64> {
 
 //-----------------------------------------------------------------------------------------------------------//
 pub fn CG(iMax: usize, tol: f64, A: &Matrix, b:&Vector) -> Vector {
+    // conjugate gradient solver
     assert!(A.num_cols() == b.num_rows());        
     
     let m = b.num_rows();
@@ -402,4 +427,41 @@ pub fn Gauss_Seidel(iMax: usize, tol: f64, A: &Matrix, b: &Vector) -> Vector {
     println!("{print}");
 
     x
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+struct Log {
+    solver: &'static str,
+    precon: Preconditioner,
+    restart: Option<usize>,
+    iMax: usize,
+    iter: usize,
+    residual: f64
+}
+
+// fn display(solver: &str, preconditioner: Preconditioner, restart: Option<usize>, iter: usize, residual: f64) -> String {
+fn display(log: Log) {
+    let solver = log.solver;
+    let precondition = match log.precon {
+        Preconditioner::GS => " with GS precondition",
+        _ => ""
+    };
+    let restart = match log.restart {
+        Some(restart) => {
+            format!("({restart})")
+        },
+        None => String::new()
+    };
+    let iter = log.iter;
+    let residual = log.residual;
+    let mut format = format!(
+        "MSolver: {solver}{restart}{precondition} {sep} iteration: {iter:5}  residual: {residual:.4E}",
+        sep="-".repeat(10)
+    );
+
+    if iter == log.iMax {
+        format += " ***** warning: maximum iteration exeeded!";
+    }
+
+    println!("{format}");
 }

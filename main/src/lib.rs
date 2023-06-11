@@ -245,36 +245,49 @@ pub fn test7() {
     // let x = preconditioner::level_schduling(&M, &v);
     // println!("{:.2}", x);
 
-    let M = Matrix::import_mtx("res/nos4.mtx");
     // let M = Matrix::import_mtx("./res/nos4.mtx");
     // let M = Matrix::import_mtx("res/bcsstm12.mtx");
     // let (M, v) = tri_diagonal(7);
-    let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
-    let v = Vector::from(v);
+    // let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
+    // let v = Vector::from(v);
     // println!("{:>13.2}", M);
 
-    let bench_result = run_benchmark(n, |_| {
-        let x = msolver::GMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
-        println!("{:.6}", x.iter().sum::<f64>());
-    });
-    let time0 = bench_result.get_average() as f64 * 1.0E-9;
+    // let bench_result = run_benchmark(n, |_| {
+    //     let x = msolver::GMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
+    //     println!("{:.6}", x.iter().sum::<f64>());
+    // });
+    // let time0 = bench_result.get_average() as f64 * 1.0E-9;
 
-    let bench_result = run_benchmark(n, |_| {
-        let x = msolver::HGMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
-        println!("{:.6}", x.iter().sum::<f64>());
-    });
-    let time1 = bench_result.get_average() as f64 * 1.0E-9;
+    // let bench_result = run_benchmark(n, |_| {
+    //     let x = msolver::HGMRES(1000, 1.0E-13, 10, &M, &v, Preconditioner::GS);
+    //     println!("{:.6}", x.iter().sum::<f64>());
+    // });
+    // let time1 = bench_result.get_average() as f64 * 1.0E-9;
 
-    let bench_result = run_benchmark(n, |_| {
-        let x = msolver::CG(1000, 1.0E-13, &M, &v);
-        println!("{:.6}", x.iter().sum::<f64>());
-    });
-    let time2 = bench_result.get_average() as f64 * 1.0E-9;
+    // let bench_result = run_benchmark(n, |_| {
+    //     let x = msolver::CG(1000, 1.0E-13, &M, &v);
+    //     println!("{:.6}", x.iter().sum::<f64>());
+    // });
+    // let time2 = bench_result.get_average() as f64 * 1.0E-9;
     
-    println!();
-    println!("GMRES: {:>10.4} sec", time0);
-    println!("HGMRES: {:>10.4} sec", time1);
-    println!("CG: {:>10.4} sec", time2);
+    // println!();
+    // println!("GMRES: {:>10.4} sec", time0);
+    // println!("HGMRES: {:>10.4} sec", time1);
+    // println!("CG: {:>10.4} sec", time2);
+
+
+    // let M = Matrix::import_mtx("res/bcsstk14.mtx");
+    let M = Matrix::import_mtx("res/orsirr_1.mtx");
+    let m = M.num_cols();
+    let v = Vector::from(vec![1f64; m]);
+    let v = &M * &v;
+
+    let x = msolver::CG(1000, 1.0E-10, &M, &v);
+    println!("{:.4}\n", x.iter().sum::<f64>());
+    let x = msolver::GMRES(1000, 1.0E-10, 10, &M, &v, Preconditioner::GS);
+    println!("{:.4}\n", x.iter().sum::<f64>());
+    // let x = msolver::HGMRES(1000, 1.0E-10, 10, &M, &v, Preconditioner::GS);
+    // println!("{:.4}", x.iter().sum::<f64>());
 }
 
 //-----------------------------------------------------------------------------------------------------------//
