@@ -9,8 +9,8 @@ pub enum Preconditioner {
     Jacobi,
     GS,
     SGS,
-    SOR(f64),
-    SSOR(f64),
+    // SOR(f64),
+    // SSOR(f64),
     ILU,
     None
 }
@@ -18,14 +18,10 @@ pub enum Preconditioner {
 impl Preconditioner {
     pub fn from(&self, A: &Matrix) -> Option<Matrix> {
         match self {
-            Preconditioner::GS => {
-                // println!("Gauss-Seidel preconditioner");
-                Some(GS(A))
-            },
-            Preconditioner::None => {
-                // println!("preconditioner not used");
-                None
-            },
+            Preconditioner::GS => Some(GS(A)),
+            Preconditioner::SGS => Some(SGS(A)),
+            Preconditioner::ILU => Some(ILU(A)),
+            Preconditioner::None => None,
             _ => panic!("not available preconditioner")
         }
     }
@@ -63,39 +59,39 @@ pub fn Jacobi(A: &Matrix, b: &Vector) -> Vector {
 }
 
 //-----------------------------------------------------------------------------------------------------------//
-pub fn Gauss_Seidel(A: &Matrix, b: &Vector) -> Vector {
-    let m = A.num_rows();
-    let mut x = Vector::from(vec![0f64; m]);
+// pub fn Gauss_Seidel(A: &Matrix, b: &Vector) -> Vector {
+//     let m = A.num_rows();
+//     let mut x = Vector::from(vec![0f64; m]);
 
-    for i in 0..m {
-        let j1 = A.IA()[i];
-        // let j2 = A.IA()[i+1];
-        let mut j = j1;
-        let mut jrow: usize;
+//     for i in 0..m {
+//         let j1 = A.IA()[i];
+//         // let j2 = A.IA()[i+1];
+//         let mut j = j1;
+//         let mut jrow: usize;
 
-        x[i] = b[i];
+//         x[i] = b[i];
 
-        loop {
-            jrow = A.JA()[j];
+//         loop {
+//             jrow = A.JA()[j];
 
-            if jrow >= i {
-                break;
-            }
+//             if jrow >= i {
+//                 break;
+//             }
 
-            x[i] -= A.AA()[j] * x[jrow]; 
+//             x[i] -= A.AA()[j] * x[jrow]; 
 
-            j += 1;
-        }
+//             j += 1;
+//         }
 
-        if jrow != i || A.AA()[j] == 0.0 {
-            panic!("diagonal element error");
-        }
+//         if jrow != i || A.AA()[j] == 0.0 {
+//             panic!("diagonal element error");
+//         }
 
-        x[i] /= A.AA()[j];
-    }
+//         x[i] /= A.AA()[j];
+//     }
 
-    x
-}
+//     x
+// }
 
 //-----------------------------------------------------------------------------------------------------------//
 pub fn level_schduling(A: &Matrix, b: &Vector) -> Vector {
@@ -192,6 +188,7 @@ pub fn GS(A: &Matrix) -> Matrix {
 
     for i in 0..m {
         let j1 = A.IA()[i];
+        let j2 = A.IA()[i+1];
         let mut j = j1;
         let mut jrow;
 
@@ -207,9 +204,13 @@ pub fn GS(A: &Matrix) -> Matrix {
             JA.push(jrow);
 
             j += 1;
+
+            if j > j2 {
+                break;
+            }
         }
 
-        // for upper elements
+        // for diagonal elements
         if jrow != i || A.AA()[j] == 0f64 {
             panic!("diagonal element error");
         }
@@ -227,7 +228,142 @@ pub fn GS(A: &Matrix) -> Matrix {
     M.set_dia_ptr(UPTR);
 
     M
-    // Matrix::new()
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn SGS(A: &Matrix) -> Matrix {
+    let m = A.num_rows();
+    let mut AA = Vec::with_capacity(A.AA().len());
+    // let mut JA = Vec::with_capacity(A.JA().len());
+    // let mut IA = vec![0usize; m+1];
+    let mut UPTR = vec![usize::MAX; m];
+
+    for i in 0..m {
+        let j1 = A.IA()[i];
+        let j2 = A.IA()[i+1];
+        let mut j = j1;
+        let mut jrow;
+
+        // for lower elements
+        loop {
+            jrow = A.JA()[j];
+
+            if jrow >= i {
+                break;
+            }
+
+            AA.push(A.AA()[j] * AA[UPTR[jrow]]);
+            // JA.push(jrow);
+
+            j += 1;
+        }
+
+        // for diagonal elements
+        if jrow != i || A.AA()[j] == 0f64 {
+            panic!("diagonal element error");
+        }
+
+        // UPTR[i] = AA.len();
+        UPTR[i] = j;
+        AA.push(1f64 / A.AA()[j]);
+        // JA.push(jrow);
+
+        // for upper elements
+        loop {
+            j += 1;
+
+            if j >= j2 {
+                break;
+            }
+
+            // jrow = A.JA()[j];
+            AA.push(A.AA()[j]);
+            // JA.push(jrow);
+        }
+
+        // IA[i+1] = AA.len();
+    }
+
+    AA.shrink_to_fit();
+    // JA.shrink_to_fit();
+
+    // let mut M = Matrix::from(AA, JA, IA);
+    let mut M = Matrix::from(AA, A.JA().clone(), A.IA().clone());
+    M.set_dia_ptr(UPTR);
+
+    M
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn ILU(A: &Matrix) -> Matrix {
+    let m = A.num_rows();
+    let mut AA = A.AA().clone();
+    let mut UPTR = vec![0usize; m];
+    let mut IW = vec![0usize; m];
+
+    for k in 0..m {
+        let j1 = A.IA()[k];
+        let j2 = A.IA()[k+1];
+
+        for j in j1..j2 {
+            IW[A.JA()[j]] = j;
+        }
+
+        let mut j = j1;
+        let mut jrow;
+
+        loop {
+            jrow = A.JA()[j];
+
+            // for diagonal elements
+            if jrow >= k {
+                break;
+            }
+
+            // for lower elements
+            let tl = AA[j] * AA[UPTR[jrow]]; 
+            AA[j] = tl;
+
+            // for upper elements
+            for jj in UPTR[jrow] + 1..A.IA()[jrow+1] {
+                let jw = IW[A.JA()[jj]];
+                if jw != 0 {
+                    AA[jw] -= tl * AA[jj];
+                }
+            }
+
+            j += 1;
+
+            if j > j2 {
+                break;
+            }
+        }
+
+        UPTR[k] = j;
+
+        if jrow != k || A.AA()[j] == 0.0 {
+            panic!("diagonal element error");
+        }
+
+        AA[j] = 1f64 / A.AA()[j];
+        
+        for i in j1..j2 {
+            IW[A.JA()[i]] = 0;
+        }
+    }
+
+    let mut M = Matrix::from(AA, A.JA().clone(), A.IA().clone());
+    M.set_dia_ptr(UPTR);
+
+    M
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+pub fn SOR(A: &Matrix) -> Matrix {
+    let m =  A.num_rows();
+
+
+    Matrix::new()
 }
 
 //-----------------------------------------------------------------------------------------------------------//

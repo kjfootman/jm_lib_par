@@ -276,18 +276,23 @@ pub fn test7() {
     // println!("CG: {:>10.4} sec", time2);
 
 
-    // let M = Matrix::import_mtx("res/bcsstk14.mtx");
-    let M = Matrix::import_mtx("res/orsirr_1.mtx");
+    let M = Matrix::import_mtx("res/bcsstk14.mtx");
+    // let M = Matrix::import_mtx("res/nos4.mtx");
+    // let M = Matrix::import_mtx("res/jpwh_991.mtx");
+    // let M = Matrix::import_mtx("res/bcsstm12.mtx");
+    // let M = Matrix::import_mtx("res/orsirr_1.mtx");
     let m = M.num_cols();
     let v = Vector::from(vec![1f64; m]);
     let v = &M * &v;
 
-    let x = msolver::CG(1000, 1.0E-10, &M, &v);
+    let x = msolver::CG(1000, 1.0E-6, &M, &v);
     println!("{:.4}\n", x.iter().sum::<f64>());
-    let x = msolver::GMRES(1000, 1.0E-10, 10, &M, &v, Preconditioner::GS);
+    let x = msolver::GMRES(1000, 1.0E-6, 10, &M, &v, Preconditioner::SGS);
     println!("{:.4}\n", x.iter().sum::<f64>());
-    // let x = msolver::HGMRES(1000, 1.0E-10, 10, &M, &v, Preconditioner::GS);
-    // println!("{:.4}", x.iter().sum::<f64>());
+    let x = msolver::GMRES(1000, 1.0E-6, 10, &M, &v, Preconditioner::ILU);
+    println!("{:.4}\n", x.iter().sum::<f64>());
+    let x = msolver::HGMRES(1000, 1.0E-6, 10, &M, &v, Preconditioner::SGS);
+    println!("{:.4}", x.iter().sum::<f64>());
 }
 
 //-----------------------------------------------------------------------------------------------------------//
@@ -299,26 +304,14 @@ pub fn test8() {
     // let M = Matrix::import_mtx("./res/bcsstk01.mtx");
     let A = Matrix::from(AA, JA, IA);
     let v = Vector::from(vec![1, 3, 13, 9]);
-     
-    // let m = 7_000_000;
-    // let m = 4;
-    // let (A, v) = tri_diagonal(m);
 
-    // let A = Matrix::import_mtx("res/nos4.mtx");
-    let A = Matrix::import_mtx("res/bcsstk01.mtx");
-    let v = (0..A.num_rows()).map(|i| A.AA()[A.IA()[i]..A.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
-    let v = Vector::from(v);
+    println!("{:.2}", A);
 
-    let M = preconditioner::GS(&A);
-    let x = preconditioner::LU_solve(&M, &v);
-    // println!("{:.2}", M);
-    // println!("{:?}", M.UPTR());
-    println!("{:.4}", x);
-    println!("{}", x.iter().sum::<f64>());
+    let M = preconditioner::SGS(&A);
+    println!("{:.2}", M);
     
-    let x = preconditioner::Gauss_Seidel(&A, &v);
-    println!("{}", x.iter().sum::<f64>());
-
+    let M = preconditioner::ILU(&A);
+    println!("{:.2}", M);
 }
 
 //-----------------------------------------------------------------------------------------------------------//

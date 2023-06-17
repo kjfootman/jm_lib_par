@@ -20,32 +20,19 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, prec
         let mut H = Vec::with_capacity(restart);
         let mut g = Vec::from(vec![0.0; restart + 1]);
         let r = b - &(A * &x);
-        // let M = precon::GS(&A);
-        // let r = precon::Gauss_Seidel(A, &r);
-        // let r = precon::Jacobi(A, &r);
 
         g[0] = r.l2_norm();
         V.push(&r / g[0]);
-
-        // * Arnoli's method
+        
+        // * Arnoldi's process - Modified Grame-Schmidt
         for j in 0..restart {
-            // let mut w = A * &V[j];
             let mut h = vec![0.0; j + 2];
-
-            // lerft preconditioning
-            // let mut w = precon::Gauss_Seidel(A, &(A * &V[j]));
-            // let mut w = precon::Jacobi(A, &(A * &V[j]));
 
             //* right preconditioning w = A * M_inv * w
             let mut w = match &P {
                 Some(M) => A * &precon::LU_solve(M, &V[j]),
                 None => A * &V[j]
             };
-            // let mut w = precon::LU_solve(&M, &V[j]);
-            // let mut w = precon::Gauss_Seidel(A, &V[j]);
-            // let mut w = precon::Jacobi(A, &V[j]);
-            // let mut w = A * &V[j];
-            // w = A * &w;
             
             for i in 0..=j {
                 h[i] = &w * &V[i];
@@ -55,11 +42,8 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, prec
             h[j+1] = w.l2_norm();
             H.push(h);
 
-            // degree = j + 1;
-
             if H[j][j+1].abs() < tol {
                 println!("lucky breakdown");
-                // degree = j;
                 break;
             }
 
@@ -73,10 +57,6 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, prec
         // * Upper triangular matrix solve
         let y = upper_triangular_solve(&H, &g);
 
-        // for i in 0..H.len() {
-        //     x += &(y[i] * &V[i]);
-        // }
-
         let mut z = Vector::from(vec![0.0; m]);
         for i in 0..H.len() {
             z += &(y[i] * &V[i]);
@@ -87,17 +67,9 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, prec
             Some(M) => &x + &precon::LU_solve(M, &z),
             None => &x + &z
         };
-        // x += &precon::LU_solve(&M, &z);
-        // x += &precon::Gauss_Seidel(A, &z);
-        // x += &precon::Jacobi(A, &z);
-        // x += &z;
 
         iter += 1;
         residual = g[H.len()].abs() / bl;
-        let tmp = (b - &(A * &x)).l2_norm() / bl;
-        // println!("residutal: {:.4e}, tmp: {:.4e}", residual * bl, tmp * bl);
-        residual = tmp;
-        // println!("iter: {iter}, residual: {residual}");
     }
 
     let log = Log {
@@ -110,18 +82,6 @@ pub fn GMRES(iMax: usize, tol: f64, restart: usize, A: &Matrix, b: &Vector, prec
     };
 
     display(log);
-    // let mut print = format!(
-    //     "MSolver: GMRES({}) {} iteration: {:5}, residual: {:.4E}",
-    //     restart,
-    //     "-".repeat(10),
-    //     iter,
-    //     residual
-    // );
-
-    // if iter == iMax {
-    //     print.push_str(", ***** maximum iteration exceeded!");
-    // }
-    // println!("{print}");
     
     x
 }
@@ -444,6 +404,8 @@ fn display(log: Log) {
     let solver = log.solver;
     let precondition = match log.precon {
         Preconditioner::GS => " with GS precondition",
+        Preconditioner::SGS => " with SGS precondition",
+        Preconditioner::ILU => " with ILU precondition",
         _ => ""
     };
     let restart = match log.restart {
