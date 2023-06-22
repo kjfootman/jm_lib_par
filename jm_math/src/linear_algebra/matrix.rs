@@ -2,7 +2,6 @@ use std::fmt;
 use std::convert::From;
 use std::ops::Mul;
 use std::path::PathBuf;
-// use std::sync::{Mutex, Arc};
 use rayon::prelude::*;
 use regex::Regex;
 // use crate::vector::Vector;
@@ -17,7 +16,6 @@ pub struct Matrix {
     UPTR: Option<Vec<usize>>
 }
 
-/***********************************************************************************************************/
 impl Matrix {
     pub fn new() -> Matrix {
         Matrix { 
@@ -28,6 +26,15 @@ impl Matrix {
             IA: Vec::new(),
             UPTR: None
         }
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn degree(&self, i: usize) -> usize {
+        // degree of node index i
+        let j1 = self.IA[i];
+        let j2 = self.IA[i+1];
+
+        self.AA[j1..j2].len()
     }
 
 //-----------------------------------------------------------------------------------------------------------//

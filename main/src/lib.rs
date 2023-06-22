@@ -316,6 +316,56 @@ pub fn test8() {
 
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
+pub fn test9() {
+    let AA = vec![
+        vec![1; 4],
+        vec![1; 5],
+        vec![1; 4],
+        vec![1; 4],
+        vec![1; 5],
+        vec![1; 4],
+        vec![1; 5],
+        vec![1; 5],
+        vec![1; 3],
+        vec![1; 3],
+        vec![1; 3],
+        vec![1; 5],
+        vec![1; 4],
+        vec![1; 4],
+        vec![1; 3]
+    ];
+    let JA = vec![
+        vec![0, 2, 7, 14],   
+        vec![1, 2, 6, 7, 12],   
+        vec![0, 1, 2, 10],   
+        vec![3, 7, 9, 14],   
+        vec![4, 6, 7, 9, 11],   
+        vec![5, 6, 12, 13],   
+        vec![1, 4, 5, 6, 11],   
+        vec![0, 1, 3, 4, 7],   
+        vec![8, 11, 13],   
+        vec![3, 4, 9],   
+        vec![2, 10, 12],   
+        vec![4, 6, 8, 11, 13],   
+        vec![1, 5, 10, 12],   
+        vec![5, 8, 11, 13],   
+        vec![0, 3, 14],   
+    ].into_iter().flatten().collect::<Vec<usize>>();
+    let mut IA = vec![0usize];
+    
+    for v in AA.iter() {
+        IA.push(v.len() + IA.last().unwrap());
+    }
+
+    let AA = AA.into_iter().flatten().collect::<Vec<_>>();
+    let A = Matrix::from(AA, JA, IA);
+
+    let tmp = (0..A.num_rows()).into_par_iter().min_by_key(|&i| A.degree(i)).unwrap();
+    println!("{:.2}, {}", tmp, A.degree(tmp));
+}
+
+//-----------------------------------------------------------------------------------------------------------//
+#[allow(non_snake_case)]
 fn tri_diagonal(m: usize) -> (Matrix, Vector) {
     let a = 2.0;
     let mut AA = vec![a, 1.0];
