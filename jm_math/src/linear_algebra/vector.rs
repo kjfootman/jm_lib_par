@@ -1,9 +1,21 @@
-use std::fmt;
-use std::convert::From;
-use std::ops::{Add, AddAssign, Sub, SubAssign, Mul, Div, Neg};
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt,
+    convert::From
+};
+use std::ops::{
+    Add, 
+    AddAssign, 
+    Sub, 
+    SubAssign, 
+    Mul, 
+    Div, 
+    Neg,
+    Deref,
+    DerefMut,
+};
 use rayon::prelude::*;
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct Vector {
     m: usize,
     AA: Vec<f64>
@@ -31,6 +43,13 @@ impl Vector {
         self.AA.par_iter()
             .map(|v| v * v)
             .sum::<f64>().sqrt()
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn permutate(self, perm: &Vec<usize>) -> Vector {
+        let AA = perm.par_iter().map(|&i| self.AA[i]).collect::<Vec<_>>();
+
+        Vector::from(AA)
     }
 }
 
@@ -184,3 +203,16 @@ impl fmt::Display for Vector {
         Ok(())
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+    
+//     #[test]
+//     fn permuate_() {
+//         let perm = vec![1usize, 0, 2];    
+//         let v = Vector::from(vec![0f64, 1f64, 2f64]);
+//         let v = v.permutate(&perm);
+//         assert_eq!(Vector::from(vec![1f64, 0f64, 2f64]), v);
+//     }
+// }

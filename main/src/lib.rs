@@ -1,6 +1,8 @@
 use std::sync::Mutex;
 
 use jm_math::prelude::*;
+use jm_cfd::prelude::*;
+use jm_cfd;
 use devtimer::{run_benchmark, DevTime};
 use rayon::prelude::*;
 
@@ -317,51 +319,92 @@ pub fn test8() {
 //-----------------------------------------------------------------------------------------------------------//
 #[allow(non_snake_case)]
 pub fn test9() {
-    let AA = vec![
-        vec![1; 4],
-        vec![1; 5],
-        vec![1; 4],
-        vec![1; 4],
-        vec![1; 5],
-        vec![1; 4],
-        vec![1; 5],
-        vec![1; 5],
-        vec![1; 3],
-        vec![1; 3],
-        vec![1; 3],
-        vec![1; 5],
-        vec![1; 4],
-        vec![1; 4],
-        vec![1; 3]
-    ];
-    let JA = vec![
-        vec![0, 2, 7, 14],   
-        vec![1, 2, 6, 7, 12],   
-        vec![0, 1, 2, 10],   
-        vec![3, 7, 9, 14],   
-        vec![4, 6, 7, 9, 11],   
-        vec![5, 6, 12, 13],   
-        vec![1, 4, 5, 6, 11],   
-        vec![0, 1, 3, 4, 7],   
-        vec![8, 11, 13],   
-        vec![3, 4, 9],   
-        vec![2, 10, 12],   
-        vec![4, 6, 8, 11, 13],   
-        vec![1, 5, 10, 12],   
-        vec![5, 8, 11, 13],   
-        vec![0, 3, 14],   
-    ].into_iter().flatten().collect::<Vec<usize>>();
-    let mut IA = vec![0usize];
+    // let AA = vec![
+    //     4.0, -1.0, -1.0, -1.0, -1.0,
+    //     -1.0, 3.0, -1.0, -1.0,
+    //     -1.0, -1.0, 2.0,
+    //     -1.0, 2.0, -1.0,
+    //     -1.0, 2.0, -1.0,
+    //     -1.0, -1.0, -1.0, 3.0
+    // ];
+    // let JA = vec![
+    //     0usize, 1, 2, 3, 5,
+    //     0, 1, 2, 4,
+    //     0, 1, 2,
+    //     0, 3, 5,
+    //     1, 4, 5,
+    //     0, 3, 4, 5
+    // ];
+    // let IA = vec![ 0usize, 5, 9, 12, 15, 18, 22 ];
+    // let M = Matrix::from(AA, JA, IA);
+    // let perm = M.RCM();
+    // println!("{:2}", M);
+    // println!("perm: {:?}", perm);
+    // println!("bandwidth - before reordering: {:2}", M.bandwidth());
+
+    // let M = M.permutate(&perm);
+    // println!("{:2}", M);
+    // println!("bandwidth - after reordering: {:2}", M.bandwidth());
+
+    //
+    // let M = Matrix::import_mtx(r"res/mtx/orsirr_1.mtx");
+    // let perm = M.RCM();
+    // // println!("{}", M);
+    // println!("bandwidth - before reordering: {}", M.bandwidth());
+
+    // let M = M.permutate_par(&perm);
+    // // println!("{}", M);
+    // println!("bandwidth - after reordering: {}", M.bandwidth());
+
+    // let bench_result = run_benchmark(10, |_| {
+    //     let M = Matrix::import_mtx(r"res/mtx/orsirr_1.mtx");
+    //     let perm = M.RCM();
+    //     let M = M.permutate(&perm);
+    //     println!("{}", M.bandwidth());
+    // });
+    // let time0 = bench_result.get_average() as f64 * 1.0E-9;
+
+    // let bench_result = run_benchmark(10, |_| {
+    //     let M = Matrix::import_mtx(r"res/mtx/orsirr_1.mtx");
+    //     let perm = M.RCM();
+    //     let M = M.permutate_par(&perm);
+    //     println!("{}", M.bandwidth());
+    // });
+    // let time1 = bench_result.get_average() as f64 * 1.0E-9;
+
+    // println!("serial: {}", time0);
+    // println!("parallel: {}", time1);
+
     
-    for v in AA.iter() {
-        IA.push(v.len() + IA.last().unwrap());
-    }
+    // let M = Matrix::import_mtx(r"res/mtx/bcsstk14.mtx");
+    // let M = Matrix::import_mtx(r"res/mtx/bcsstk01.mtx");
+    let M = Matrix::import_mtx(r"res/mtx/orsirr_1.mtx");
+    let v = (0..M.num_rows()).map(|i| M.AA()[M.IA()[i]..M.IA()[i+1]].iter().sum()).collect::<Vec<f64>>();
+    let v = Vector::from(v);
+    let perm = M.RCM();
+    
+    let M2 = M.clone();
+    let v2 = v.clone();
+    let M1 = M.permutate_par(&perm);
+    let v1 = v.permutate(&perm);
 
-    let AA = AA.into_iter().flatten().collect::<Vec<_>>();
-    let A = Matrix::from(AA, JA, IA);
+    let bench_result = run_benchmark(10, |_| {
+        let x = msolver::GMRES(1000, 1.0E-7, 10, &M2, &v2, Preconditioner::ILU);
+        println!("{:.6}", x.par_iter().sum::<f64>());
+    });
+    let time1 = bench_result.get_average() as f64 * 1.0E-9;
 
-    let tmp = (0..A.num_rows()).into_par_iter().min_by_key(|&i| A.degree(i)).unwrap();
-    println!("{:.2}, {}", tmp, A.degree(tmp));
+    let bench_result = run_benchmark(10, |_| {
+        let x = msolver::GMRES(1000, 1.0E-7, 10, &M1, &v1, Preconditioner::ILU);
+        println!("{:.6}", x.par_iter().sum::<f64>());
+    });
+    let time0 = bench_result.get_average() as f64 * 1.0E-9;
+    
+    println!("after RCM: {}", time0);
+    println!("brefore RCM: {}", time1);
+    println!("after: {}", M1.bandwidth());
+    println!("before: {}", M2.bandwidth());
+    
 }
 
 //-----------------------------------------------------------------------------------------------------------//
@@ -397,4 +440,9 @@ fn tri_diagonal(m: usize) -> (Matrix, Vector) {
     let v = Vector::from(v);
 
     (M, v)
+}
+
+pub fn test10() {
+    let p = Point::new(0.1, 2.0, 3.1);
+    println!("{:?}", p);
 }

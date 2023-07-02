@@ -1,12 +1,15 @@
-use std::fmt;
-use std::convert::From;
-use std::ops::Mul;
-use std::path::PathBuf;
+use std::{
+    fmt,
+    collections::HashSet,
+    convert::From,
+    ops::Mul,
+    path::PathBuf,
+};
 use rayon::prelude::*;
 use regex::Regex;
-// use crate::vector::Vector;
 use crate::linear_algebra::vector::Vector;
 
+#[derive(Debug, Clone)]
 pub struct Matrix {
     m: usize,
     n: usize,
@@ -29,13 +32,197 @@ impl Matrix {
     }
 
 //-----------------------------------------------------------------------------------------------------------//
-    pub fn degree(&self, i: usize) -> usize {
-        // degree of node index i
+    fn degree(&self, i: usize) -> usize {
+        // degree of a node i
         let j1 = self.IA[i];
         let j2 = self.IA[i+1];
+        let rows = &self.JA[j1..j2];
 
-        self.AA[j1..j2].len()
+        if rows.contains(&i) {
+            rows.len() - 1
+        } else {
+            rows.len()
+        }
     }
+    
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn neighbor(&self, i: usize) -> Vec<usize> {
+        // todo: return neighbor nodes
+        (&self.JA[self.IA[i]..self.IA[i+1]]).to_vec()
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn bandwidth(&self) -> usize {
+        // return bandwidth of a matrix, max|i - j|
+        let m = self.m;
+
+        let bw = (0..m).into_par_iter().map(|i| {
+            let j1 = self.IA[i];
+            let j2 = self.IA[i+1];
+
+            self.JA[j1..j2].iter().map(|&j| i.abs_diff(j))
+                .max_by(|x, y| x.cmp(y)).unwrap()
+
+        }).max().expect("can not find a max value");
+
+        bw
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn RCM(&self) -> Vec<usize> {
+        // reverse Cuthill-McKee
+        assert!(self.num_cols() == self.num_rows());
+
+        let m = self.num_rows();
+        let mut next: usize;
+        let mut levset = HashSet::new();
+        let mut marker = vec![0usize; m];
+        let mut iperm = vec![usize::MAX; m];
+        let mut iter = 0;
+
+        //* find a initial node which has the minimum degree
+        let i = (0..m).into_par_iter().min_by_key(|&i| self.degree(i))
+            .expect("can not find a initial node");
+
+        levset.insert(i);
+        next = 1;
+        marker[i] = 1;
+        iperm[0] = i;
+
+        while next < m  && iter < m{
+            // println!("iter: {iter}, next: {next}, m: {m}");
+
+            let mut next_levset = HashSet::new(); 
+            let mut nodes = levset.into_iter().collect::<Vec<usize>>();
+
+            nodes.sort_by(|&i, &j| 
+                self.degree(i).cmp(&self.degree(j)).then(i.cmp(&j))
+            );
+            
+            for j in nodes {
+                //* neighbors oredered by its degree
+                let mut neighbor = self.neighbor(j);
+                neighbor.sort_by(|&i, &j|
+                    self.degree(i).cmp(&self.degree(j)).then(i.cmp(&j))
+                );
+
+                //* visiting neighbour i of a node j in degree increasing order
+                for i in neighbor {
+                    if marker[i] == 0 {
+                        next_levset.insert(i);
+                        marker[i] = 1;
+                        iperm[next] = i;
+                        next += 1;
+                    }
+                }
+            }
+            
+            levset = next_levset;
+
+            iter += 1;
+        }
+
+        iperm.reverse();
+        iperm
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    pub fn permutate_par(self, perm: &Vec<usize>) -> Matrix {
+        // permutate matrix with permutation vector
+        if self.m != perm.len() {
+            panic!("theh length of permuation arrays is not equal to the number of rows");
+        };
+
+        let m = self.m;
+        let mut inverse = vec![usize::MAX; m];
+        
+        // set inverse array of perm
+        for i in 0..m {
+            inverse[perm[i]] = i;
+        }
+
+        let argsort = (0..m).into_par_iter()
+            .map(|i| {
+                let j1 = self.IA[perm[i]];
+                let j2 = self.IA[perm[i]+1];
+                let ja = &self.JA[j1..j2];
+
+                // sort cols by inverse
+                let mut argsort = (0..j2-j1).collect::<Vec<_>>();
+                argsort.sort_by_key(|&j| inverse[ja[j]]);
+
+                argsort
+            }).collect::<Vec<Vec<_>>>();
+
+        let AA = argsort.par_iter().enumerate()
+            .map(|(i, indices)| {
+                let j1 = self.IA[perm[i]];
+                let j2 = self.IA[perm[i]+1];
+                let aa = &self.AA[j1..j2];
+                let aa = indices.iter().map(|&j| aa[j]).collect::<Vec<_>>();
+
+                aa
+            }).flatten().collect::<Vec<_>>();
+        
+        let JA = argsort.par_iter().enumerate()
+            .map(|(i, indices)| {
+                let j1 = self.IA[perm[i]];
+                let j2 = self.IA[perm[i]+1];
+                let ja = &self.JA[j1..j2];
+                let ja = indices.iter().map(|&j| inverse[ja[j]]).collect::<Vec<_>>();
+
+                ja
+            }).flatten().collect::<Vec<_>>();
+        
+        // todo: to be improved by parallelism
+        let mut IA = Vec::with_capacity(m + 1);
+        IA.push(0);
+        for i in 0..m {
+            IA.push(IA[i] + argsort[i].len())
+        }
+
+        Matrix::from(AA, JA, IA)
+    }
+
+//-----------------------------------------------------------------------------------------------------------//
+    // pub fn permutate(self, perm: &Vec<usize>) -> Matrix {
+    //     // permutate matrix with permutation vector
+    //     // assert!(self.m == perm.len());
+
+    //     let m = self.m;
+    //     let mut inverse = vec![usize::MAX; m];
+    //     let mut AA = Vec::with_capacity(self.AA.len());
+    //     let mut JA = Vec::with_capacity(self.JA.len());
+    //     let mut IA = Vec::with_capacity(self.IA.len());
+
+    //     // set inverse array of perm
+    //     for i in 0..m {
+    //         inverse[perm[i]] = i;
+    //     }
+        
+    //     IA.push(0);
+    //     for i in 0..m {
+    //         let j1 = self.IA[perm[i]];
+    //         let j2 = self.IA[perm[i]+1];
+    //         let aa = &self.AA[j1..j2];
+    //         let ja = &self.JA[j1..j2];
+
+    //         // sort cols by inverse
+    //         let mut argsort = (0..j2-j1).collect::<Vec<_>>();
+    //         argsort.sort_by_key(|&j| inverse[ja[j]]);
+
+    //         // argsort();
+    //         argsort.iter().for_each(|&j| {
+    //             AA.push(aa[j]);
+    //             JA.push(inverse[ja[j]]);
+    //         });
+
+    //         IA.push(AA.len());
+    //         // println!("{:?}", argsort);
+    //     }
+
+    //     Matrix::from(AA, JA, IA)
+    // }
 
 //-----------------------------------------------------------------------------------------------------------//
     pub fn import_mtx(path: &str) -> Matrix {
@@ -170,8 +357,8 @@ impl Matrix {
         &self.IA
     }
 
-    pub fn UPTR(&self) -> &Option<Vec<usize>> {
-        &self.UPTR
+    pub fn UPTR(&self) -> Option<&Vec<usize>> {
+        self.UPTR.as_ref()
     }
 
     pub fn set_dia_ptr(&mut self, UPTR: Vec<usize>) {
@@ -179,7 +366,6 @@ impl Matrix {
     }
 }
 
-/***********************************************************************************************************/
 impl Mul<&Vector> for &Matrix {
     type Output = Vector;
 
@@ -200,7 +386,6 @@ impl Mul<&Vector> for &Matrix {
     }
 }
 
-/***********************************************************************************************************/
 impl<I: IntoIterator> From<I> for Matrix 
     where I::Item: IntoIterator, <<I as IntoIterator>::Item as IntoIterator>::Item: Into<f64> {
     fn from(value: I) -> Self {
@@ -217,7 +402,6 @@ impl<I: IntoIterator> From<I> for Matrix
     }
 }
 
-/***********************************************************************************************************/
 impl fmt::Display for Matrix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let m = self.m;
@@ -245,3 +429,11 @@ impl fmt::Display for Matrix {
         Ok(())
     } 
 }
+
+// #[cfg(test)]
+// mod tests {
+//     #[test]
+//     fn RCM_test() {
+//         assert!(false);
+//     }
+// }

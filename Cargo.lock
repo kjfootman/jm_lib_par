@@ -110,6 +110,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "453ad9f582a441959e5f0d088b02ce04cfe8d51a8eaf077f12ac6d3e94164ca6"
 
 [[package]]
+name = "jm_cfd"
+version = "0.1.0"
+
+[[package]]
 name = "jm_math"
 version = "0.1.0"
 dependencies = [
@@ -130,6 +134,7 @@ name = "main"
 version = "0.1.0"
 dependencies = [
  "devtimer",
+ "jm_cfd",
  "jm_math",
  "rayon",
 ]

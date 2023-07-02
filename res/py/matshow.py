@@ -2,7 +2,8 @@ import matplotlib.pyplot as plt
 
 def main():
     M = list()
-    with open(r"/Users/h1007185/workspace/Rust/jm_lib_par/res/py/matrix.txt") as f:
+    # with open(r"/Users/h1007185/workspace/Rust/jm_lib_par/res/py/matrix.txt") as f:
+    with open(r"res/py/matrix2.txt") as f:
         lines = f.readlines()
         for line in lines:
             # print(line.strip())

@@ -1,13 +1,8 @@
 [package]
-name = "main"
+name = "jm_cfd"
 version = "0.1.0"
 edition = "2021"
-default-run = "main"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-jm_math = {path = "../jm_math"}
-jm_cfd = {path = "../jm_cfd"}
-rayon = {workspace = true}
-devtimer = "*"

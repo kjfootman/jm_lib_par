@@ -1,5 +1,5 @@
 [workspace]
-members = ["main", "jm_math"]
+members = ["main", "jm_math", "jm_cfd"]
 
 [workspace.dependencies]
 serde = "1.0.162"
